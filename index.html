@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <meta name="color-scheme" content="dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="YNAB 26">
+  <meta name="application-name" content="YNAB 26">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="referrer" content="no-referrer">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+  <title>YNAB 26</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0f1115; --card:#181b22; --field:#1f232c; --field-focus:#252a34; --ink:#e8ebf1; --muted:#9aa3b5; --line:#2a2f3a;
+  --brand:#14706b; --brand2:#4fd1b5; --accent:#2bb39a; --accent-soft:rgba(43,179,154,.16);
+  --pos:#3ddc97; --neg:#ff6b6b; --neg-strong:#c93c3c; --neg-soft:rgba(255,107,107,.14); --warn:#f0a93b; --warn-soft:rgba(240,169,59,.15);
+  --hero1:#0f3d3e; --hero2:#14706b;
+  --radius:18px; --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  /* Visible viewport. JS (syncViewport) replaces these with window.visualViewport numbers, so sheets
+     shrink above the on-screen keyboard instead of being pushed off the top. */
+  --vvh:100vh; --vvt:0px;
+}
+@supports (height:100dvh){:root{--vvh:100dvh}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Inter,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+option,optgroup{background:var(--card);color:var(--ink)}
+input::placeholder{color:#7f889b}
+#app{max-width:560px;margin:0 auto;min-height:100vh;position:relative}
+.topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px;background:linear-gradient(180deg,var(--bg) 80%,rgba(15,17,21,0))}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--brand2)}
+h1{margin:2px 0 0;font-size:24px;letter-spacing:-.02em}
+.icon-btn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;cursor:pointer;color:var(--ink)}
+.icon-btn svg{width:20px;height:20px}
+main{padding:0 16px calc(96px + var(--safe-b))}
+.view{display:none;animation:fade .18s ease}
+.view.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:12px}
+
+/* add */
+.hero{background:linear-gradient(140deg,var(--hero1) 0%,var(--hero2) 100%);color:#fff;text-align:center;padding:16px 16px 18px}
+.seg{display:inline-flex;background:rgba(255,255,255,.14);padding:4px;border-radius:12px;gap:4px}
+.seg-btn{border:0;background:transparent;color:rgba(255,255,255,.85);padding:7px 18px;border-radius:9px;font-weight:600;font-size:14px;cursor:pointer}
+.seg-btn.active{background:#fff;color:var(--hero1)}
+.amount-wrap{display:flex;align-items:center;justify-content:center;margin:14px 0 2px}
+.cur{font-size:30px;font-weight:600;opacity:.75;margin-right:4px}
+#amount{background:transparent;border:0;outline:0;color:#fff;font-size:46px;font-weight:700;letter-spacing:-.03em;width:7ch;text-align:left;caret-color:var(--accent)}
+#amount::placeholder{color:rgba(255,255,255,.45)}
+.hint{font-size:13px;opacity:.75}
+.fields{padding:6px 16px}
+.field{display:block;padding:12px 0;border-bottom:1px solid var(--line)}
+.fields>.field:last-child{border-bottom:0}
+.field>span{display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.field input:not([type=checkbox]),.field select{width:100%;border:1px solid var(--line);background:var(--field);border-radius:12px;padding:12px 12px;font-size:16px;outline:0;-webkit-appearance:none;appearance:none}
+.field input:focus,.field select:focus{border-color:var(--brand2);background:var(--field-focus);box-shadow:0 0 0 3px rgba(79,209,181,.18)}
+.select-wrap{position:relative}
+.select-wrap:after{content:"";position:absolute;right:14px;top:50%;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-70%) rotate(45deg);pointer-events:none}
+.cat-bal{font-size:13px;margin-top:6px;color:var(--muted);min-height:18px}
+.cat-bal b{color:var(--ink)} .cat-bal .neg{color:var(--neg)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--field);border-radius:999px;padding:8px 14px;font-size:14px;font-weight:500;cursor:pointer}
+.chip.active{background:var(--brand);border-color:var(--brand);color:#fff}
+.toggle-field{display:flex;flex-direction:column;align-items:flex-start}
+.switch{position:relative;display:inline-block;width:52px;height:32px;margin-top:6px}
+.switch input{opacity:0;width:0;height:0}
+.switch i{position:absolute;inset:0;background:#3a404d;border-radius:999px;transition:.2s}
+.switch i:before{content:"";position:absolute;width:26px;height:26px;left:3px;top:3px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:.2s}
+.switch input:checked+i{background:var(--accent)} .switch input:checked+i:before{transform:translateX(20px)}
+.primary{width:100%;border:0;border-radius:16px;padding:16px;background:var(--brand);color:#fff;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 8px 20px rgba(0,0,0,.35);cursor:pointer}
+.primary:disabled{opacity:.6}
+.error{background:var(--neg-soft);color:var(--neg);border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:10px}
+.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:22px 4px 8px}
+
+/* lists */
+.list{list-style:none;margin:0;padding:0;background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.list li{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.list li:last-child{border-bottom:0}
+.avatar{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:15px;flex:none;background:var(--accent-soft);color:var(--brand2)}
+.grow{flex:1;min-width:0}
+.t1{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t2{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.amt.in{color:var(--pos)}
+.pending{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn);margin-left:6px;vertical-align:middle}
+
+/* balances */
+.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.summary-grid.three{grid-template-columns:1fr 1fr 1fr}
+.stat{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:12px 14px}
+.stat-label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.stat-value{font-size:20px;font-weight:700;letter-spacing:-.02em;margin-top:2px;font-variant-numeric:tabular-nums}
+.three .stat-value{font-size:17px}
+.stat-value.neg{color:var(--neg)} .stat-value.pos{color:var(--pos)}
+.search{display:flex;align-items:center;gap:8px;background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:0 14px;margin-bottom:10px}
+.search svg{width:18px;height:18px;color:var(--muted);flex:none}
+.search input{border:0;outline:0;background:transparent;padding:13px 0;width:100%;font-size:16px}
+.chips.filter{margin-bottom:14px}
+.group-title{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin:16px 4px 6px;display:flex;justify-content:space-between}
+.bal li .amt{font-size:15px}
+.bal li.neg{background:linear-gradient(90deg,var(--neg-soft),var(--card) 70%)}
+.bal li.neg .amt{color:var(--neg)}
+.bal li.low .amt{color:var(--warn)}
+.pill{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;margin-left:8px;vertical-align:middle}
+.pill.neg{background:var(--neg-strong);color:#fff} .pill.low{background:var(--warn-soft);color:var(--warn)}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+
+/* charts */
+.month-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.month-label{font-weight:700;font-size:17px}
+.chart-card h3{margin:0;font-size:16px}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.mini-toggle{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.mini-toggle input{accent-color:var(--brand2);width:16px;height:16px}
+.donut-wrap{position:relative;height:220px;margin:4px 0 10px}
+.donut-center{position:absolute;inset:0;display:grid;place-items:center;text-align:center;pointer-events:none}
+.donut-center b{display:block;font-size:22px;letter-spacing:-.02em}
+.donut-center span{font-size:12px;color:var(--muted)}
+.cat-bars{box-shadow:none;border-radius:0}
+.cat-bars li{padding:10px 2px;display:block}
+.cat-bars .top{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}
+.cat-bars .top .nm{display:flex;align-items:center;gap:8px;min-width:0}
+.cat-bars .sw{width:10px;height:10px;border-radius:3px;flex:none}
+.bar{height:6px;background:#2a2f3a;border-radius:99px;margin-top:6px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px}
+.trend-wrap{height:210px}
+.legend{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:3px} .dot.spend{background:#1f9e8f} .dot.inc{background:#9fd8cb;margin-left:6px}
+
+/* chrome */
+.tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:100%;max-width:560px;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(22,25,31,.92);backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);border-top:1px solid var(--line);padding:8px 8px calc(8px + var(--safe-b));z-index:10}
+.tab{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--muted);padding:4px 0;min-height:48px;min-width:0;cursor:pointer;white-space:nowrap}
+.tab svg{width:24px;height:24px}
+.tab.active{color:var(--brand2)}
+.toast{position:fixed;left:50%;bottom:calc(84px + var(--safe-b));transform:translate(-50%,20px);background:#2a303c;color:#fff;border:1px solid #3a404d;box-shadow:0 8px 24px rgba(0,0,0,.45);padding:11px 16px;border-radius:12px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:.25s;z-index:20;max-width:90%;text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.loading{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:30;transition:opacity .2s}
+.loading.hide{opacity:0;pointer-events:none}
+.spinner{width:18px;height:18px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+.spinner.big{width:34px;height:34px;border-color:#2f3542;border-top-color:var(--brand2)}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* picker button */
+.picker-btn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);background:var(--field);border-radius:12px;padding:12px;font-size:16px;text-align:left;cursor:pointer;min-height:48px}
+.picker-btn:after{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-25%) rotate(45deg);flex:none}
+.picker-btn .pv{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.picker-btn .pv.placeholder{color:#7f889b}
+.section-row{display:flex;align-items:baseline;justify-content:space-between}
+.link{border:0;background:transparent;color:var(--brand2);font-weight:600;font-size:15px;padding:8px 4px;cursor:pointer}
+.link.strong{font-weight:700}
+.secondary{width:100%;border:1px solid var(--line);background:var(--card);border-radius:14px;padding:14px;font-weight:600;color:var(--brand2);margin-top:12px;cursor:pointer}
+.danger{width:100%;border:0;background:transparent;color:var(--neg);font-weight:600;padding:14px;margin-top:6px;border-radius:14px;cursor:pointer}
+.danger.confirm{background:var(--neg-strong);color:#fff}
+.hint-line{font-size:12px;color:var(--muted);margin:0 4px 4px}
+.row-note{font-size:11px;color:#7f889b;text-align:center;margin-top:4px}
+
+/* recent tab */
+.tx-list li{cursor:pointer}
+.tx-list li:active{background:#20242d}
+.clr{flex:none;width:30px;height:30px;border-radius:50%;border:2px solid var(--warn);background:transparent;display:grid;place-items:center;cursor:pointer;padding:0}
+.clr svg{width:16px;height:16px;opacity:0}
+.clr.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.clr.on svg{opacity:1}
+.clr.busy{opacity:.5}
+.amt.out{color:var(--ink)}
+.acct-tag{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:#262b35;color:var(--muted);border-radius:6px;padding:1px 5px;margin-left:4px;vertical-align:1px}
+
+/* bottom sheets: the wrap covers exactly the visible viewport (above the keyboard) */
+.sheet-wrap{position:fixed;left:0;right:0;top:var(--vvt);height:var(--vvh);z-index:40;pointer-events:none;overflow:hidden}
+.sheet-wrap.top{z-index:50}
+.backdrop{position:absolute;inset:0;background:rgba(0,0,0,.62);opacity:0;transition:opacity .2s}
+.sheet{position:absolute;left:50%;bottom:0;width:100%;max-width:560px;max-height:calc(100% - 10px);display:flex;flex-direction:column;background:var(--bg);border-radius:22px 22px 0 0;transform:translate(-50%,105%);transition:transform .26s cubic-bezier(.2,.8,.2,1);box-shadow:0 -10px 40px rgba(0,0,0,.5);border-top:1px solid var(--line);margin:0}
+/* .full sheets are pinned to the top of the visible area, so their header (and the picker's search box)
+   can never be pushed above the screen; only .sheet-body scrolls. */
+.sheet.full{top:clamp(6px,5%,44px);bottom:0;max-height:none;transform:translate(-50%,18px);opacity:0;visibility:hidden;transition:transform .22s cubic-bezier(.2,.8,.2,1),opacity .18s,visibility 0s linear .22s}
+.sheet.tall{background:var(--card)}
+.sheet-wrap.open{pointer-events:auto}
+.sheet-wrap.open .backdrop{opacity:1}
+.sheet-wrap.open .sheet{transform:translate(-50%,0)}
+.sheet-wrap.open .sheet.full{opacity:1;visibility:visible;transition:transform .22s cubic-bezier(.2,.8,.2,1),opacity .18s,visibility 0s}
+.grip{width:40px;height:5px;border-radius:9px;background:#3a404d;margin:8px auto 2px;flex:none}
+.sheet-title{display:flex;align-items:center;justify-content:space-between;padding:2px 12px 6px;flex:none}
+.sheet-title b{font-size:16px}
+.sheet-body{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:4px 16px calc(18px + var(--safe-b));flex:1 1 auto;min-height:0;overscroll-behavior:contain}
+/* while typing, leave room so the last field can still be scrolled up above the keyboard */
+.sheet-body.kb{padding-bottom:45vh}
+.hero.compact{padding:12px 16px 14px}
+.hero.compact #eAmount{font-size:38px}
+#eAmount{background:transparent;border:0;outline:0;color:#fff;font-size:46px;font-weight:700;letter-spacing:-.03em;width:7ch;text-align:left;caret-color:var(--accent)}
+.sheet-search{display:flex;align-items:center;gap:6px;padding:6px 12px 8px;flex:none;border-bottom:1px solid var(--line)}
+.sheet-search .search{flex:1;margin:0;box-shadow:none;background:var(--field)}
+#catOptions{position:relative;padding:0 0 calc(18px + var(--safe-b))}
+.opt-group{position:sticky;top:0;background:var(--card);font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;padding:12px 18px 6px;z-index:1}
+.opt{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;text-align:left;padding:0 18px;min-height:50px;font-size:16px;border-bottom:1px solid var(--line);cursor:pointer}
+.opt:active{background:#20242d}
+.opt .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opt mark{background:rgba(43,179,154,.35);color:inherit;border-radius:3px;padding:0 1px}
+.opt .ob{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted)}
+.opt .ob.neg{color:var(--neg)} .opt .ob.low{color:var(--warn)}
+.opt.sel{background:var(--accent-soft)}
+.opt.sel .nm{font-weight:700;color:var(--brand2)}
+.opt .ck{width:18px;color:var(--brand2);flex:none;text-align:center;font-weight:800}
+body.noscroll{overflow:hidden;position:fixed;left:0;right:0;width:100%}
+.top-actions{display:flex;gap:8px}
+.place-hint{display:flex;align-items:center;gap:8px;background:rgba(61,220,151,.12);color:#9be8c4;border:1px solid rgba(61,220,151,.3);border-radius:14px;padding:10px 8px 10px 12px;margin:0 0 12px;font-size:14px;line-height:1.3}
+.place-hint[hidden]{display:none}
+.place-hint svg{width:20px;height:20px;flex:none}
+.place-hint .ph-text{flex:1;min-width:0}
+.place-hint .link{color:#d7f7e8;font-weight:700;min-height:40px;padding:0 8px}
+.place-hint .ph-x{background:none;border:0;font-size:24px;line-height:1;color:inherit;width:40px;height:40px;border-radius:10px;cursor:pointer}
+.set-row{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}
+.field>span.set-text{display:flex;flex-direction:column;gap:3px;margin:0;font-size:inherit;font-weight:400;color:inherit;text-transform:none;letter-spacing:0}
+.set-row .switch{flex:none;margin-top:0}
+.set-text{display:flex;flex-direction:column;gap:3px;text-transform:none;letter-spacing:0}
+.set-text b{font-size:16px;color:var(--ink)}
+.set-text small{font-size:13px;color:var(--muted);font-weight:400;line-height:1.35}
+#description::-webkit-calendar-picker-indicator,#eDescription::-webkit-calendar-picker-indicator{display:none!important;opacity:0}
+.set-status{font-size:13px;color:var(--muted);padding:2px 2px 0}
+.set-status b{color:var(--ink)}
+
+/* field header with a side action (Category + Split) */
+.field-head{display:flex;align-items:center;justify-content:space-between;margin:-6px 0 0}
+.field-head>span{display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.link.mini{font-size:14px;padding:6px 2px 6px 12px;min-height:36px}
+.link.muted{color:var(--muted)}
+.field-head .link[hidden]{display:none}
+
+/* split: summary on the Add form */
+.split-sum{border:1px solid var(--line);background:var(--field);border-radius:12px;padding:4px 12px 2px}
+.split-sum[hidden],.picker-btn[hidden],.cat-bal[hidden],#catBal[hidden]{display:none}
+.split-sum-list{list-style:none;margin:0;padding:0}
+.split-sum-list li{display:flex;align-items:baseline;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:15px}
+.split-sum-list li:last-child{border-bottom:0}
+.split-sum-list .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.split-sum-list small{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.split-sum-list .amt{font-size:15px}
+.split-sum-list li.bad .amt{color:var(--neg)}
+.split-sum.mismatch{border-color:rgba(255,107,107,.6)}
+.split-sum.mismatch .amt{color:var(--neg)}
+.split-sum-actions{display:flex;justify-content:space-between;border-top:1px solid var(--line)}
+
+/* split: sheet */
+.split-total{padding:4px 16px 12px}
+.split-total .field{border-bottom:0;padding-bottom:6px}
+.money-in{position:relative;display:block}
+.money-in>i{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-style:normal;color:var(--muted);font-weight:600;pointer-events:none}
+.field .money-in input,.money-in input{padding-left:26px!important;font-variant-numeric:tabular-nums}
+#sTotal{font-size:22px!important;font-weight:700;padding-top:10px!important;padding-bottom:10px!important}
+.split-meta{font-size:13px;color:var(--muted)}
+.remain{position:sticky;top:-4px;z-index:2;margin:0 0 10px;border-radius:12px;padding:10px 12px;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:8px;background:linear-gradient(var(--warn-soft),var(--warn-soft)),var(--bg);color:var(--warn);border:1px solid rgba(240,169,59,.35);box-shadow:0 -6px 0 var(--bg)}
+.remain.over{background:linear-gradient(var(--neg-soft),var(--neg-soft)),var(--bg);color:var(--neg);border-color:rgba(255,107,107,.4)}
+.remain.ok{background:linear-gradient(rgba(61,220,151,.13),rgba(61,220,151,.13)),var(--bg);color:var(--pos);border-color:rgba(61,220,151,.35)}
+.remain b{font-variant-numeric:tabular-nums}
+.split-line{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:10px 12px 12px;margin-bottom:10px;border:1px solid transparent}
+.split-line.bad{border-color:rgba(255,107,107,.55)}
+.sl-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.sl-x{border:0;background:transparent;color:var(--muted);font-size:22px;line-height:1;width:36px;height:32px;margin:-6px -8px -6px 0;border-radius:10px;cursor:pointer}
+.sl-row{display:grid;grid-template-columns:minmax(0,1fr) 128px;gap:8px;margin-top:8px}
+.split-line input{width:100%;border:1px solid var(--line);background:var(--field);border-radius:12px;padding:11px 12px;font-size:16px;outline:0;-webkit-appearance:none;appearance:none;min-width:0}
+.split-line input:focus{border-color:var(--brand2);background:var(--field-focus);box-shadow:0 0 0 3px rgba(79,209,181,.18)}
+.split-line .picker-btn{min-height:46px;padding:11px 12px}
+.sl-amt{position:relative}
+.sl-rest{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:var(--accent-soft);color:var(--brand2);font-size:12px;font-weight:700;border-radius:8px;padding:6px 7px;cursor:pointer}
+.sl-rest[hidden]{display:none}
+.sl-amt.has-rest input{padding-right:50px}
+.add-line{margin-top:2px}
+.add-line:disabled{opacity:.5}
+#sDoneBottom{margin-top:14px}
+
+/* ---- PWA additions (home-screen app) ---- */
+:root{--safe-t:env(safe-area-inset-top,0px);--safe-l:env(safe-area-inset-left,0px);--safe-r:env(safe-area-inset-right,0px)}
+html{background:var(--bg)}
+body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-y:none}
+.topbar{padding-top:calc(18px + var(--safe-t))}
+.sheet.full{top:calc(clamp(6px,5%,44px) + var(--safe-t))}
+.keyscreen{position:fixed;inset:0;z-index:70;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:calc(24px + var(--safe-t)) 20px calc(24px + var(--safe-b));overflow-y:auto}
+.keyscreen[hidden]{display:none}
+.key-card{width:100%;max-width:400px;text-align:center}
+.key-card img{width:72px;height:72px;border-radius:18px;box-shadow:var(--shadow);margin-bottom:14px}
+.key-card h1{margin:4px 0 8px;font-size:24px}
+.key-card p{color:var(--muted);margin:0 0 18px;font-size:14px}
+.key-card input{width:100%;background:var(--field);border:1px solid var(--line);border-radius:14px;padding:14px;font-size:16px;text-align:center;letter-spacing:.02em;outline:0;margin-bottom:12px}
+.key-card input:focus{border-color:var(--accent);background:var(--field-focus)}
+.key-card .error{text-align:left;margin-bottom:12px}
+.key-card .key-foot{font-size:12px;margin-top:16px;color:var(--muted)}
+.set-row-plain{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.set-row-plain small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+</style>
+</head>
+<body>
+  <!-- ============ ACCESS KEY (first run) ============ -->
+  <div class="keyscreen" id="keyScreen" hidden>
+    <form class="key-card" id="keyForm" autocomplete="off" novalidate>
+      <img src="icons/icon-192.png" alt="">
+      <div class="eyebrow">YNAB 26</div>
+      <h1>Enter your access key</h1>
+      <p>Paste the private access key from your setup link. You only need to do this once on this phone.</p>
+      <input id="keyInput" name="key" placeholder="Access key" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="Access key">
+      <div class="error" id="keyError" hidden></div>
+      <button class="primary" id="keySave" type="submit"><span class="btn-label">Continue</span><span class="spinner" hidden></span></button>
+      <div class="key-foot">The key stays on this phone. It is never shown to anyone else.</div>
+    </form>
+  </div>
+
+  <div id="app">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">YNAB 26</div>
+        <h1 id="hello">Hi there</h1>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="refreshBtn" aria-label="Refresh">
+          <svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="icon-btn" id="settingsBtn" aria-label="Settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <!-- ============ ADD ============ -->
+      <section id="view-add" class="view active" aria-label="Add transaction">
+        <form id="txForm" autocomplete="off" novalidate>
+          <div class="card hero">
+            <div class="seg" role="tablist" id="flowSeg">
+              <button type="button" class="seg-btn active" data-flow="Outflow">Outflow</button>
+              <button type="button" class="seg-btn" data-flow="Inflow">Inflow</button>
+            </div>
+            <label class="amount-wrap">
+              <span class="cur">$</span>
+              <input id="amount" name="amount" inputmode="decimal" placeholder="0.00" aria-label="Amount">
+            </label>
+            <div class="hint" id="flowHint">Money going out</div>
+          </div>
+
+          <div class="place-hint" id="placeHint" hidden>
+            <svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="9.5" r="2.5" fill="currentColor"/></svg>
+            <span class="ph-text" id="placeHintText"></span>
+            <button type="button" class="link" id="placeUndo">Undo</button>
+            <button type="button" class="ph-x" id="placeX" aria-label="Dismiss">&times;</button>
+          </div>
+
+          <div class="card fields">
+            <label class="field">
+              <span>Description</span>
+              <input id="description" list="descList" placeholder="Walmart, Costco gas&#8230;" maxlength="200">
+              <datalist id="descList"></datalist>
+            </label>
+
+            <div class="field">
+              <div class="field-head"><span>Category</span><button type="button" class="link mini" id="splitBtn" aria-haspopup="dialog">Split</button></div>
+              <button type="button" class="picker-btn" id="categoryBtn" aria-haspopup="dialog"><span class="pv placeholder">Choose a category</span></button>
+              <input type="hidden" id="category">
+              <div class="cat-bal" id="catBal"></div>
+              <div class="split-sum" id="splitSummary" hidden>
+                <ul class="split-sum-list" id="splitSumList"></ul>
+                <div class="split-sum-actions">
+                  <button type="button" class="link" id="splitEdit">Edit split</button>
+                  <button type="button" class="link muted" id="splitRemove">Remove split</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <span>Account</span>
+              <div class="chips" id="accountChips"></div>
+            </div>
+
+            <label class="field">
+              <span>Date</span>
+              <input id="date" type="date">
+            </label>
+          </div>
+
+          <div class="error" id="formError" hidden></div>
+          <button class="primary" id="saveBtn" type="submit">
+            <span class="btn-label">Add transaction</span><span class="spinner" hidden></span>
+          </button>
+        </form>
+
+        <div class="section-row"><h2 class="section-title">Recent</h2><button type="button" class="link" id="seeAll">See all</button></div>
+        <ul class="list tx-list" id="recentList"></ul>
+      </section>
+
+      <!-- ============ RECENT ============ -->
+      <section id="view-recent" class="view" aria-label="Recent transactions">
+        <div class="search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="txSearch" type="search" placeholder="Filter loaded transactions" autocomplete="off">
+        </div>
+        <div class="hint-line">Tap a transaction to edit it &#183; tap the circle to mark it cleared</div>
+        <div id="txList"></div>
+        <button type="button" class="secondary" id="loadMore" hidden>Load more</button>
+      </section>
+
+      <!-- ============ BALANCES ============ -->
+      <section id="view-balances" class="view" aria-label="Category balances">
+        <div class="summary-grid">
+          <div class="stat"><div class="stat-label">Available</div><div class="stat-value" id="balTotal">&#8212;</div></div>
+          <div class="stat"><div class="stat-label">Overspent</div><div class="stat-value" id="balNeg">&#8212;</div></div>
+        </div>
+        <div class="search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="balSearch" type="search" placeholder="Search categories">
+        </div>
+        <div class="chips filter" id="balFilter">
+          <button class="chip active" data-f="all">All</button>
+          <button class="chip" data-f="neg">Overspent</button>
+          <button class="chip" data-f="low">Under $25</button>
+        </div>
+        <div id="balList"></div>
+      </section>
+
+      <!-- ============ CHARTS ============ -->
+      <section id="view-charts" class="view" aria-label="Spending charts">
+        <div class="month-nav">
+          <button class="icon-btn" id="prevMonth" aria-label="Previous month"><svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <div class="month-label" id="monthLabel">&#8212;</div>
+          <button class="icon-btn" id="nextMonth" aria-label="Next month"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+        <div class="summary-grid three">
+          <div class="stat"><div class="stat-label">Spent</div><div class="stat-value" id="kSpent">&#8212;</div></div>
+          <div class="stat"><div class="stat-label">Income</div><div class="stat-value" id="kIncome">&#8212;</div></div>
+          <div class="stat"><div class="stat-label">Net</div><div class="stat-value" id="kNet">&#8212;</div></div>
+        </div>
+
+        <div class="card chart-card">
+          <div class="card-head">
+            <h3>By category</h3>
+            <label class="mini-toggle"><input type="checkbox" id="inclSavings"><span>Incl. savings</span></label>
+          </div>
+          <div class="donut-wrap"><canvas id="donut"></canvas><div class="donut-center" id="donutCenter"></div></div>
+          <ul class="list cat-bars" id="catBars"></ul>
+        </div>
+
+        <div class="card chart-card">
+          <div class="card-head"><h3>Monthly trend</h3><div class="legend"><i class="dot spend"></i>Spent <i class="dot inc"></i>Income</div></div>
+          <div class="trend-wrap"><canvas id="trend"></canvas></div>
+        </div>
+      </section>
+    </main>
+
+    <nav class="tabbar">
+      <button class="tab active" data-view="add">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Add</span>
+      </button>
+      <button class="tab" data-view="recent">
+        <svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="4" cy="6" r="1.3" fill="currentColor"/><circle cx="4" cy="12" r="1.3" fill="currentColor"/><circle cx="4" cy="18" r="1.3" fill="currentColor"/></svg>
+        <span>Recent</span>
+      </button>
+      <button class="tab" data-view="balances">
+        <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 10h18M16 14.5h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Balances</span>
+      </button>
+      <button class="tab" data-view="charts">
+        <svg viewBox="0 0 24 24"><path d="M5 20V11M12 20V5M19 20v-7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <span>Spending</span>
+      </button>
+    </nav>
+
+    <!-- ============ EDIT SHEET ============ -->
+    <div class="sheet-wrap" id="editWrap" aria-hidden="true">
+      <div class="backdrop" data-close="edit"></div>
+      <form class="sheet full" id="editForm" role="dialog" aria-modal="true" aria-label="Edit transaction" autocomplete="off" novalidate>
+        <div class="grip"></div>
+        <div class="sheet-title"><button type="button" class="link" id="eCancel">Cancel</button><b>Edit transaction</b><button type="submit" class="link strong" id="eSaveTop">Save</button></div>
+        <div class="sheet-body">
+          <div class="card hero compact">
+            <div class="seg" id="eFlowSeg">
+              <button type="button" class="seg-btn active" data-flow="Outflow">Outflow</button>
+              <button type="button" class="seg-btn" data-flow="Inflow">Inflow</button>
+            </div>
+            <label class="amount-wrap"><span class="cur">$</span><input id="eAmount" inputmode="decimal" placeholder="0.00" aria-label="Amount"></label>
+            <div class="hint" id="eFlowHint">Money going out</div>
+          </div>
+          <div class="card fields">
+            <label class="field"><span>Description</span><input id="eDescription" list="descList" maxlength="200"></label>
+            <div class="field">
+              <span>Category</span>
+              <button type="button" class="picker-btn" id="eCategoryBtn" aria-haspopup="dialog"><span class="pv placeholder">Choose a category</span></button>
+              <input type="hidden" id="eCategory">
+              <div class="cat-bal" id="eCatBal"></div>
+            </div>
+            <div class="field"><span>Account</span><div class="chips" id="eAccountChips"></div></div>
+            <label class="field"><span>Date</span><input id="eDate" type="date"></label>
+          </div>
+          <div class="error" id="eFormError" hidden></div>
+          <button class="primary" id="eSave" type="submit"><span class="btn-label">Save changes</span><span class="spinner" hidden></span></button>
+          <button type="button" class="danger" id="eDelete">Delete transaction</button>
+          <div class="row-note" id="eRowNote"></div>
+        </div>
+      </form>
+    </div>
+
+    <!-- ============ SPLIT SHEET ============ -->
+    <div class="sheet-wrap" id="splitWrap" aria-hidden="true">
+      <div class="backdrop" data-close="split"></div>
+      <div class="sheet full" id="splitSheet" role="dialog" aria-modal="true" aria-label="Split transaction">
+        <div class="grip"></div>
+        <div class="sheet-title"><button type="button" class="link" id="sCancel">Cancel</button><b>Split transaction</b><button type="button" class="link strong" id="sDone">Done</button></div>
+        <div class="sheet-body" id="splitBody">
+          <div class="card split-total">
+            <label class="field">
+              <span>Total</span>
+              <span class="money-in"><i>$</i><input id="sTotal" inputmode="decimal" placeholder="0.00" autocomplete="off" aria-label="Total"></span>
+            </label>
+            <div class="split-meta" id="sMeta"></div>
+          </div>
+          <div class="remain" id="sRemain" role="status"></div>
+          <div id="sLines"></div>
+          <button type="button" class="secondary add-line" id="sAddLine">+ Add line</button>
+          <div class="error" id="sError" hidden></div>
+          <button type="button" class="primary" id="sDoneBottom">Done</button>
+          <button type="button" class="danger" id="sUnsplit">Don&#39;t split</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CATEGORY PICKER ============ -->
+    <div class="sheet-wrap top" id="catWrap" aria-hidden="true">
+      <div class="backdrop" data-close="cat"></div>
+      <div class="sheet full tall" role="dialog" aria-modal="true" aria-label="Choose a category">
+        <div class="grip"></div>
+        <div class="sheet-search">
+          <div class="search">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <input id="catSearch" type="search" placeholder="Type to filter categories" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done">
+          </div>
+          <button type="button" class="link" id="catCancel">Cancel</button>
+        </div>
+        <div class="sheet-body" id="catOptions"></div>
+      </div>
+    </div>
+
+    <!-- ============ SETTINGS ============ -->
+    <div class="sheet-wrap" id="setWrap" aria-hidden="true">
+      <div class="backdrop" data-close="settings"></div>
+      <div class="sheet" role="dialog" aria-modal="true" aria-label="Settings">
+        <div class="grip"></div>
+        <div class="sheet-title"><span></span><b>Settings</b><button type="button" class="link strong" id="setDone">Done</button></div>
+        <div class="sheet-body">
+          <div class="card fields">
+            <label class="field toggle-field set-row">
+              <span class="set-text"><b>Remember places</b><small>Use this phone's location to pre-fill description, category and account where you've bought before.</small></span>
+              <span class="switch"><input id="locToggle" type="checkbox"><i></i></span>
+            </label>
+            <div class="set-status" id="locStatus"></div>
+            <div class="set-status" id="placeCount"></div>
+          </div>
+          <button type="button" class="danger" id="forgetPlaces">Forget saved places</button>
+          <div class="row-note">Saved places are shared by everyone who uses this app.</div>
+          <div class="card fields">
+            <div class="field set-row-plain">
+              <span class="set-text"><b>Access key</b><small id="keyWho">Saved on this phone.</small></span>
+            </div>
+          </div>
+          <button type="button" class="danger" id="forgetKey">Remove access key from this phone</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status"></div>
+    <div class="loading" id="loading"><div class="spinner big"></div></div>
+  </div>
+
+  <script src="vendor/chart.umd.min.js"></script>
+  <script src="config.js"></script>
+  <script src="lib.js"></script>
+<script>
+(function () {
+  'use strict';
+  var S = { boot: null, balances: [], month: null, year: null, charts: {}, filter: 'all', spendCache: {},
+            short: [], rec: { items: [], hasMore: false, loaded: false, loading: false },
+            edit: null, loc: null, locStatus: 'idle', places: [], autofill: null, split: null };
+  var PALETTE = ['#1f9e8f','#2bb39a','#e58fc0','#5fc4d6','#f2a541','#e06c5a','#8c83f5','#9fd8cb','#c9a227','#5b9de6','#6b7488'];
+  var PAGE = 50;
+  var $ = function (id) { return document.getElementById(id); };
+  var money = function (n, cents) {
+    var v = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: cents === false ? 0 : 2, maximumFractionDigits: cents === false ? 0 : 2 });
+    return (n < 0 ? '-$' : '$') + v;
+  };
+  var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var CHECK = '<svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var LS = {
+    get: function (k, d) { try { var v = localStorage.getItem('ynab26.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set: function (k, v) { try { localStorage.setItem('ynab26.' + k, JSON.stringify(v)); } catch (e) {} }
+  };
+
+  /* ---------------- API client ----------------
+     Every server call is one POST to the Apps Script JSON API (site/config.js API_URL). The body is
+     JSON text sent with no custom headers, so the browser uses Content-Type text/plain and skips the
+     CORS preflight Apps Script cannot answer. Apps Script replies with a redirect to
+     script.googleusercontent.com, which fetch follows. Reply: {ok:true, result} or {ok:false, error}. */
+  var CFG = window.YNAB_CONFIG || {};
+  var API_URL = String(CFG.API_URL || '');
+  var API_READY = /^https:\/\/script\.google(usercontent)?\.com\//.test(API_URL) || CFG.ALLOW_ANY_API_URL === true;
+  var KEY_LS = 'ynab26.apiKey';
+  var API_TIMEOUT_MS = 45000;
+  function getKey() { try { return localStorage.getItem(KEY_LS) || ''; } catch (e) { return ''; } }
+  function setKey(k) { try { if (k) localStorage.setItem(KEY_LS, k); else localStorage.removeItem(KEY_LS); } catch (e) {} }
+  function apiError(msg, code) { var e = new Error(msg); e.code = code || ''; return e; }
+  function call(fn) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    if (!API_READY) return Promise.reject(apiError('This copy of the app is not connected to the budget yet (API_URL in config.js).', 'config'));
+    var key = getKey();
+    if (!key) { showKeyScreen(); return Promise.reject(apiError('Enter your access key first.', 'unauthorized')); }
+    var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    var timer = ctl && setTimeout(function () { ctl.abort(); }, API_TIMEOUT_MS);
+    return fetch(API_URL, {
+      method: 'POST', body: JSON.stringify({ key: key, action: fn, args: args }),
+      redirect: 'follow', credentials: 'omit', cache: 'no-store', signal: ctl ? ctl.signal : undefined
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        try { return JSON.parse(t); } catch (e) { throw apiError('The budget server sent an unexpected reply (HTTP ' + r.status + '). Try again in a minute.', 'bad_reply'); }
+      });
+    }, function (e) {
+      throw apiError(e && e.name === 'AbortError' ? 'The budget server took too long to answer. Check your connection and try again.'
+        : 'Could not reach the budget server. Check your connection and try again.', 'network');
+    }).then(function (j) {
+      if (j && j.ok === true) return j.result;
+      var err = j && j.error ? String(j.error) : 'Server error';
+      if (err === 'unauthorized') {
+        setKey('');
+        showKeyScreen('That access key was not accepted. Check it and try again.');
+        throw apiError('Your access key was not accepted.', 'unauthorized');
+      }
+      throw apiError(err, 'server');
+    }).then(function (v) { clearTimeout(timer); return v; }, function (e) { clearTimeout(timer); throw e; });
+  }
+
+  /* ---------------- access key screen ---------------- */
+  function showKeyScreen(msg) {
+    var ks = $('keyScreen'); ks.hidden = false;
+    $('keyError').textContent = msg || (API_READY ? '' : 'This copy of the app is not connected to the budget yet: put the API URL into config.js.');
+    $('keyError').hidden = !$('keyError').textContent;
+    $('keySave').disabled = !API_READY;
+    keyBusy(false);
+  }
+  function hideKeyScreen() { $('keyScreen').hidden = true; $('keyInput').value = ''; }
+  function keyBusy(on) {
+    $('keySave').disabled = on || !API_READY;
+    $('keySave').querySelector('.spinner').hidden = !on;
+    $('keySave').querySelector('.btn-label').textContent = on ? 'Checking\u2026' : 'Continue';
+  }
+  function cleanKey(k) { return String(k || '').replace(/^\s*#?key=/i, '').replace(/\s+/g, ''); }
+  // One-tap setup: opening https://.../#key=XXXX saves the key and removes it from the address bar.
+  function takeKeyFromHash() {
+    var m = /(?:^#|&)key=([^&]*)/.exec(location.hash || '');
+    if (!m) return false;
+    var k = '';
+    try { k = cleanKey(decodeURIComponent(m[1])); } catch (e) { k = cleanKey(m[1]); }
+    if (k) setKey(k);
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { location.hash = ''; }
+    return !!k;
+  }
+  takeKeyFromHash();
+  // The setup link opened while the app is already showing: take the new key and start over.
+  window.addEventListener('hashchange', function () {
+    if (takeKeyFromHash()) { S.boot = null; $('loading').classList.remove('hide'); boot(); }
+  });
+  function toast(msg) {
+    var t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('show'); }, 2600);
+  }
+  function errMsg(e, d) { return (e && e.message) || d; }
+  function isoToDate(iso) { var p = iso.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function fmtShortDate(iso) { return isoToDate(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+  function dayLabel(iso) {
+    var d = isoToDate(iso), t = isoToDate(S.boot.today), diff = Math.round((t - d) / 864e5);
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Yesterday';
+    return d.toLocaleDateString('en-US', d.getFullYear() === t.getFullYear() ? { weekday: 'short', month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  var isIncome = function (c) { return /^\s*--\s*Income/i.test(c); };
+  var isTransfer = function (c) { return /^\s*--/.test(c); };
+  function strip(t) { return { row: t.row, date: t.date, description: t.description, category: t.category, account: t.account, amount: t.amount, flow: t.flow, cleared: !!t.cleared }; }
+  function sameTx(a, b) {
+    return a.row === b.row && a.date === b.date && a.description === b.description && a.category === b.category &&
+      a.account === b.account && +a.amount === +b.amount && a.flow === b.flow && !!a.cleared === !!b.cleared;
+  }
+
+  /* ---------------- navigation & sheets ---------------- */
+  function show(view) {
+    document.querySelectorAll('.view').forEach(function (v) { v.classList.toggle('active', v.id === 'view-' + view); });
+    document.querySelectorAll('.tab').forEach(function (t) { t.classList.toggle('active', t.dataset.view === view); });
+    window.scrollTo(0, 0);
+    if (view === 'charts') loadSpending();
+    if (view === 'recent') ensureRecent();
+    if (view === 'add') locate();
+    try { history.replaceState(null, '', '#' + view); } catch (e) {}
+  }
+  document.querySelectorAll('.tab').forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.view); }); });
+  $('seeAll').addEventListener('click', function () { show('recent'); });
+
+  var SHEETS = { edit: 'editWrap', cat: 'catWrap', settings: 'setWrap', split: 'splitWrap' };
+  // Lock the page behind a sheet with position:fixed (overflow:hidden alone doesn't stop iOS from
+  // scrolling the page when the keyboard opens) and put the scroll position back afterwards.
+  var lockY = 0;
+  function lockPage() {
+    if (document.body.classList.contains('noscroll')) return;
+    lockY = window.pageYOffset || 0;
+    document.body.style.top = -lockY + 'px';
+    document.body.classList.add('noscroll');
+  }
+  function unlockPage() {
+    if (!document.body.classList.contains('noscroll')) return;
+    document.body.classList.remove('noscroll'); document.body.style.top = '';
+    window.scrollTo(0, lockY);
+  }
+  function openSheet(id) { var w = $(id); w.classList.add('open'); w.setAttribute('aria-hidden', 'false'); lockPage(); syncViewport(); }
+  function closeSheet(id) {
+    var w = $(id); w.classList.remove('open'); w.setAttribute('aria-hidden', 'true');
+    var a = document.activeElement; if (a && w.contains(a) && a.blur) a.blur();
+    if (!document.querySelector('.sheet-wrap.open')) unlockPage();
+  }
+
+  /* ---------------- keyboard-safe sheets ----------------
+     Sheets are sized to the *visible* viewport (window.visualViewport shrinks when the keyboard opens),
+     their header stays put and only .sheet-body scrolls. A focused field is scrolled into view inside its
+     own .sheet-body by hand, never with scrollIntoView (which also scrolls the Apps Script parent page). */
+  var root = document.documentElement;
+  function syncViewport() {
+    var vv = window.visualViewport, h = window.innerHeight, t = 0;
+    if (vv) { h = Math.min(h, vv.height); t = Math.max(0, vv.offsetTop || 0); }
+    if (h > 0) root.style.setProperty('--vvh', Math.round(h) + 'px');
+    root.style.setProperty('--vvt', Math.round(t) + 'px');
+    var f = document.activeElement; if (f && f.closest && f.closest('.sheet-body')) keepVisible(f);
+  }
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncViewport);
+    window.visualViewport.addEventListener('scroll', syncViewport);
+  }
+  window.addEventListener('resize', syncViewport);
+  window.addEventListener('orientationchange', function () { setTimeout(syncViewport, 300); });
+  syncViewport();
+  var COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  function keepVisible(el) {
+    var body = el.closest('.sheet-body'); if (!body) return;
+    var br = body.getBoundingClientRect(), er = el.getBoundingClientRect(), pad = 12;
+    // Keep the field in the upper part of the list on phones: inside the Apps Script iframe some
+    // browsers don't report the keyboard to visualViewport, so the bottom of the sheet may be covered.
+    var bottom = COARSE ? Math.min(br.bottom, br.top + Math.max(160, br.height * 0.6)) : br.bottom;
+    var st = body.querySelector('.remain'), top = br.top + pad + (st && st !== el ? st.offsetHeight + 4 : 0);
+    if (er.top < top) body.scrollTop -= top - er.top;
+    else if (er.bottom > bottom - pad) body.scrollTop += Math.min(er.bottom - (bottom - pad), er.top - top);
+  }
+  document.addEventListener('focusin', function (e) {
+    var t = e.target; if (!t || !t.matches || !t.matches('input,textarea,select')) return;
+    var body = t.closest('.sheet-body'); if (!body) return;
+    body.classList.add('kb');
+    keepVisible(t);
+    var again = function () { if (document.activeElement === t) keepVisible(t); };   // only while it still has focus
+    setTimeout(again, 80); setTimeout(again, 400);
+  });
+  document.addEventListener('focusout', function (e) {
+    var body = e.target && e.target.closest && e.target.closest('.sheet-body'); if (!body) return;
+    setTimeout(function () { var a = document.activeElement; if (!(a && body.contains(a) && a.matches('input,textarea,select'))) body.classList.remove('kb'); }, 150);
+  });
+  function focusNoScroll(el) { try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); } }
+  document.querySelectorAll('[data-close]').forEach(function (b) { b.addEventListener('click', function () { closeSheet(SHEETS[b.dataset.close]); }); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var open = document.querySelectorAll('.sheet-wrap.open'); if (open.length) closeSheet(open[open.length - 1].id);
+  });
+
+  /* ---------------- category picker (type to filter) ---------------- */
+  var picker = { cb: null, cur: '', shown: [] };
+  function openPicker(cur, cb) {
+    picker.cb = cb; picker.cur = cur || '';
+    $('catSearch').value = ''; renderOptions();
+    openSheet('catWrap');
+    focusNoScroll($('catSearch'));     // synchronous with the tap so iOS raises the keyboard
+    var box = $('catOptions'); box.scrollTop = 0;
+    // centre the current choice inside the list only (scrollIntoView would also scroll the parent page)
+    var sel = box.querySelector('.opt.sel');
+    if (sel) box.scrollTop = Math.max(0, sel.offsetTop - (box.clientHeight - sel.offsetHeight) / 2);
+  }
+  function hl(name, q) {
+    if (!q) return esc(name);
+    var i = name.toLowerCase().indexOf(q);
+    return i < 0 ? esc(name) : esc(name.slice(0, i)) + '<mark>' + esc(name.slice(i, i + q.length)) + '</mark>' + esc(name.slice(i + q.length));
+  }
+  function renderOptions() {
+    var q = $('catSearch').value.trim().toLowerCase(), types = S.boot.types;
+    var bal = {}; S.balances.forEach(function (b) { bal[b.name.trim()] = b.balance; });
+    var groups = [
+      { label: 'Spending categories', test: function (t) { return !isTransfer(t); } },
+      { label: 'Income', test: isIncome },
+      { label: 'Transfers & payments', test: function (t) { return isTransfer(t) && !isIncome(t); } }
+    ];
+    picker.shown = [];
+    var html = groups.map(function (g) {
+      var items = types.filter(function (t) { return g.test(t) && (!q || t.trim().toLowerCase().indexOf(q) >= 0); });
+      if (!items.length) return '';
+      return '<div class="opt-group">' + esc(g.label) + '</div>' + items.map(function (t) {
+        var i = picker.shown.push(t) - 1, nm = t.trim(), b = bal[nm], sel = t === picker.cur;
+        var ob = b === undefined ? '' : '<span class="ob' + (b < 0 ? ' neg' : b < 25 ? ' low' : '') + '">' + money(b) + '</span>';
+        return '<button type="button" class="opt' + (sel ? ' sel' : '') + '" data-i="' + i + '"><span class="nm">' + hl(nm, q) + '</span>' + ob +
+          '<span class="ck">' + (sel ? '\u2713' : '') + '</span></button>';
+      }).join('');
+    }).join('');
+    $('catOptions').innerHTML = html || '<div class="empty">No category matches \u201C' + esc(q) + '\u201D</div>';
+  }
+  function pickOption(i) { var v = picker.shown[i]; if (v === undefined) return; closeSheet('catWrap'); $('catSearch').blur(); if (picker.cb) picker.cb(v); }
+  $('catSearch').addEventListener('input', function () { renderOptions(); $('catOptions').scrollTop = 0; });
+  $('catSearch').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); if (picker.shown.length) pickOption(0); } });
+  $('catOptions').addEventListener('click', function (e) { var b = e.target.closest('.opt'); if (b) pickOption(+b.dataset.i); });
+  $('catCancel').addEventListener('click', function () { closeSheet('catWrap'); });
+
+  /* ---------------- shared form controller (Add = '', Edit = 'e') ---------------- */
+  function Form(p) {
+    var self = this;
+    this.p = p; this.flow = 'Outflow'; this.account = ''; this.keepAccount = '';
+    this.el = function (k) { return $(p ? p + k.charAt(0).toUpperCase() + k.slice(1) : k); };
+    this.el('flowSeg').querySelectorAll('.seg-btn').forEach(function (b) { b.addEventListener('click', function () { self.setFlow(b.dataset.flow); }); });
+    this.el('categoryBtn').addEventListener('click', function () {
+      openPicker(self.el('category').value, function (v) { self.setCategory(v, true); self.touched = true; });
+    });
+    this.el('description').addEventListener('change', function () { self.autofillFromDescription(); });
+    this.el('description').addEventListener('input', function () { self.touched = true; });
+  }
+  Form.prototype.setFlow = function (f) {
+    this.flow = f;
+    this.el('flowSeg').querySelectorAll('.seg-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.flow === f); });
+    this.el('flowHint').textContent = f === 'Outflow' ? 'Money going out' : 'Money coming in (income, refund, payment received)';
+  };
+  Form.prototype.setCategory = function (c, byUser) {
+    this.el('category').value = c || '';
+    var pv = this.el('categoryBtn').querySelector('.pv');
+    pv.textContent = c ? c.trim() : 'Choose a category';
+    pv.classList.toggle('placeholder', !c);
+    if (byUser && isIncome(c)) this.setFlow('Inflow');
+    this.showCatBalance();
+  };
+  Form.prototype.showCatBalance = function () {
+    var c = this.el('category').value.trim(), el = this.el('catBal');
+    var hit = S.balances.filter(function (b) { return b.name.trim() === c; })[0];
+    if (!hit) { el.innerHTML = ''; return; }
+    el.innerHTML = hit.balance < 0
+      ? '<span class="neg">Overspent by <b class="neg">' + money(-hit.balance) + '</b></span>'
+      : '<b>' + money(hit.balance) + '</b> available';
+  };
+  Form.prototype.accountList = function () {
+    var list = S.boot.accounts.slice();
+    if (this.keepAccount && list.indexOf(this.keepAccount) < 0) list.push(this.keepAccount);   // hidden account already on this transaction
+    return list;
+  };
+  Form.prototype.canUseAccount = function (a) { return this.accountList().indexOf(a) >= 0; };
+  Form.prototype.renderAccounts = function () {
+    var self = this, wrap = this.el('accountChips');
+    wrap.innerHTML = this.accountList().map(function (a) {
+      var hidden = S.boot.accounts.indexOf(a) < 0;
+      return '<button type="button" class="chip' + (a === self.account ? ' active' : '') + '" data-a="' + esc(a) + '">' + esc(a) +
+        (hidden ? '<span class="acct-tag">hidden</span>' : '') + '</button>';
+    }).join('');
+    wrap.querySelectorAll('.chip').forEach(function (c) {
+      c.addEventListener('click', function () { self.account = c.dataset.a; self.renderAccounts(); });
+    });
+  };
+  Form.prototype.setAccount = function (a) { if (this.canUseAccount(a)) { this.account = a; this.renderAccounts(); } };
+  // Category/account from the last time this description was used.
+  Form.prototype.autofillFromDescription = function () {
+    var d = this.el('description').value.trim().toLowerCase();
+    var hit = (S.boot.memory || []).filter(function (t) { return t.description.toLowerCase() === d; })[0];
+    if (!hit) return;
+    var splitting = this === addForm && S.split;     // a split already has its categories
+    if (!splitting && !this.el('category').value && S.boot.types.indexOf(hit.category) >= 0) this.setCategory(hit.category, true);
+    this.setAccount(hit.account);
+  };
+  Form.prototype.fill = function (t) {
+    this.el('amount').value = (+t.amount).toFixed(2);
+    this.el('description').value = t.description;
+    this.el('date').value = t.date;
+    this.setFlow(t.flow === 'Inflow' ? 'Inflow' : 'Outflow');
+    this.setCategory(t.category, false);
+    this.account = t.account; this.renderAccounts();
+  };
+  Form.prototype.values = function () {
+    return { date: this.el('date').value, description: this.el('description').value.trim(), category: this.el('category').value,
+             account: this.account, amount: this.el('amount').value.replace(/[$,\s]/g, ''), flow: this.flow };
+  };
+  Form.prototype.problem = function (tx) {
+    return !(+tx.amount > 0) ? 'Enter an amount.' : !tx.description ? 'Add a description.' : !tx.category ? 'Pick a category.' :
+      !tx.account ? 'Pick an account.' : !tx.date ? 'Pick a date.' : '';
+  };
+  Form.prototype.busy = function (btn, on, label) {
+    btn.disabled = on; btn.querySelector('.spinner').hidden = !on; btn.querySelector('.btn-label').textContent = label;
+  };
+
+  var addForm = new Form(''), editForm = new Form('e');
+
+  /* ---------------- add ---------------- */
+  function defaultAccount() {
+    var a = S.boot.lastAccount;
+    return S.boot.accounts.indexOf(a) >= 0 ? a : (S.boot.accounts[0] || '');
+  }
+  function resetForm() {
+    $('amount').value = ''; $('description').value = '';
+    $('date').value = S.boot.today;
+    S.split = null; renderSplitSummary();
+    addForm.setFlow('Outflow'); addForm.setCategory('', false);
+    addForm.account = addForm.account && addForm.canUseAccount(addForm.account) ? addForm.account : defaultAccount();
+    addForm.renderAccounts(); addForm.touched = false;
+    hidePlaceHint(); S.autofill = null;
+  }
+
+  $('txForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var err = $('formError'); err.hidden = true;
+    if (S.split) return submitSplit();
+    var tx = addForm.values();
+    tx.requestId = newRequestId();
+    var problem = addForm.problem(tx);
+    if (problem) { err.textContent = problem; err.hidden = false; return; }
+    var loc = usableLoc(); if (loc) tx.loc = loc;
+    var btn = $('saveBtn'); addForm.busy(btn, true, 'Saving\u2026');
+    call('addTransaction', tx).then(function (res) {
+      S.balances = res.balances; renderBalances(); renderRecent(res.recent);
+      if (res.places) S.places = res.places;
+      S.spendCache = {};
+      // the new row went in at the top, so everything already loaded moved down one row
+      if (S.rec.loaded && res.recent[0]) {
+        S.rec.items.forEach(function (t) { t.row++; });
+        S.rec.items.unshift(strip(res.recent[0]));
+        renderTxList();
+      }
+      toast((tx.flow === 'Inflow' ? '+' : '\u2212') + money(+tx.amount) + ' \u00B7 ' + tx.category.trim() + ' added');
+      resetForm(); S.loc = null; locate();
+    }).catch(function (e2) {
+      err.textContent = errMsg(e2, 'Could not save. Try again.'); err.hidden = false;
+    }).then(function () { addForm.busy(btn, false, 'Add transaction'); });
+  });
+
+  function newRequestId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  /* ---------------- split (Add only) ----------------
+     S.split = committed lines shown on the Add form; SP = working copy while the split sheet is open.
+     All money math is in whole cents via the shared toCents_/checkSplit_ helpers (same code as Code.gs). */
+  var SP = null;
+  function cleanAmt(v) { return String(v == null ? '' : v).replace(/[$,\s]/g, ''); }
+  function centsField(c) { return (c / 100).toFixed(2); }
+  function splitCheck(sp) {
+    var total = toCents_(cleanAmt(sp.total));
+    var chk = checkSplit_(total || 0, sp.lines.map(function (l) { return cleanAmt(l.amount); }));
+    chk.total = total; return chk;
+  }
+  // First problem with a split, or '' if it can be saved. Marks bad lines when `mark` is set.
+  function splitProblem(sp, mark) {
+    var chk = splitCheck(sp), msg = '', bad = {};
+    if (!(chk.total > 0)) msg = 'Enter the total first.';
+    else if (sp.lines.length < 2) msg = 'A split needs at least 2 lines.';
+    sp.lines.forEach(function (l, i) {
+      var c = chk.cents[i], p = !l.category ? 'pick a category' : c === null ? 'enter an amount like 12.34' : !(c > 0) ? 'enter an amount greater than $0' : '';
+      if (p) { bad[i] = 1; if (!msg) msg = 'Line ' + (i + 1) + ': ' + p + '.'; }
+    });
+    if (!msg && chk.remaining !== 0) msg = chk.remaining > 0
+      ? 'Assign the remaining ' + centsStr_(chk.remaining) + ' (the lines must add up to ' + centsStr_(chk.total) + ').'
+      : 'The lines are ' + centsStr_(-chk.remaining) + ' over the ' + centsStr_(chk.total) + ' total.';
+    if (mark) document.querySelectorAll('#sLines .split-line').forEach(function (el, i) { el.classList.toggle('bad', !!bad[i]); });
+    return msg;
+  }
+  function openSplit() {
+    var amt = cleanAmt($('amount').value);
+    if (S.split) SP = { total: S.split.total, lines: S.split.lines.map(function (l) { return Object.assign({}, l); }) };
+    else SP = { total: toCents_(amt) ? centsField(toCents_(amt)) : '', lines: [{ category: $('category').value || '', amount: '', memo: '' }, { category: '', amount: '', memo: '' }] };
+    $('sTotal').value = SP.total; $('sError').hidden = true;
+    renderSplitLines(); openSheet('splitWrap');
+    $('splitBody').scrollTop = 0;
+    if (!SP.total) focusNoScroll($('sTotal'));
+  }
+  function renderSplitMeta() {
+    $('sMeta').textContent = addForm.flow + ' \u00B7 ' + (addForm.account || 'no account') + ' \u00B7 ' +
+      ($('date').value ? fmtShortDate($('date').value) : 'no date') + ($('description').value.trim() ? ' \u00B7 ' + $('description').value.trim() : '');
+  }
+  function renderSplitLines() {
+    var n = SP.lines.length;
+    $('sLines').innerHTML = SP.lines.map(function (l, i) {
+      return '<div class="split-line" data-k="' + i + '">' +
+        '<div class="sl-head"><span>Line ' + (i + 1) + '</span>' + (n > 2 ? '<button type="button" class="sl-x" data-act="rm" aria-label="Remove line ' + (i + 1) + '">&times;</button>' : '') + '</div>' +
+        '<button type="button" class="picker-btn" data-act="cat" aria-haspopup="dialog"><span class="pv' + (l.category ? '' : ' placeholder') + '">' + esc(l.category ? l.category.trim() : 'Choose a category') + '</span></button>' +
+        '<div class="sl-row">' +
+          '<input class="sl-memo" data-f="memo" placeholder="Memo (optional)" maxlength="200" value="' + esc(l.memo || '') + '" autocomplete="off">' +
+          '<span class="money-in sl-amt"><i>$</i><input data-f="amount" inputmode="decimal" placeholder="0.00" value="' + esc(l.amount || '') + '" autocomplete="off" aria-label="Line ' + (i + 1) + ' amount">' +
+          '<button type="button" class="sl-rest" data-act="rest" hidden>Rest</button></span>' +
+        '</div></div>';
+    }).join('');
+    $('sAddLine').disabled = n >= SPLIT_MAX_LINES;
+    $('sAddLine').textContent = n >= SPLIT_MAX_LINES ? 'Up to ' + SPLIT_MAX_LINES + ' lines' : '+ Add line';
+    renderSplitMeta(); renderRemaining();
+  }
+  function renderRemaining() {
+    var chk = splitCheck(SP), el = $('sRemain'), cls = 'remain', html;
+    if (!(chk.total > 0)) html = '<span>Enter the total to split</span>';
+    else if (chk.remaining > 0) html = '<span>Left to assign</span><b>' + centsStr_(chk.remaining) + '</b>';
+    else if (chk.remaining < 0) { cls += ' over'; html = '<span>Over by</span><b>' + centsStr_(-chk.remaining) + '</b>'; }
+    else { cls += ' ok'; html = '<span>All ' + centsStr_(chk.total) + ' assigned</span><b>' + CHECK.replace('<svg', '<svg width="18" height="18"') + '</b>'; }
+    el.className = cls; el.innerHTML = html;
+    $('sError').hidden = true;                 // any change clears the last Done error
+    // "Rest" fills a line with whatever is left (only offered on lines that would end up > $0)
+    document.querySelectorAll('#sLines .split-line').forEach(function (row, i) {
+      var c = chk.cents[i] || 0, b = row.querySelector('.sl-rest'), show = chk.total > 0 && chk.remaining !== 0 && c + chk.remaining > 0;
+      b.hidden = !show; row.querySelector('.sl-amt').classList.toggle('has-rest', show);
+    });
+  }
+  $('sTotal').addEventListener('input', function () { SP.total = $('sTotal').value; renderRemaining(); });
+  $('sLines').addEventListener('input', function (e) {
+    var row = e.target.closest('.split-line'), f = e.target.dataset.f; if (!row || !f) return;
+    SP.lines[+row.dataset.k][f] = e.target.value;
+    if (f === 'amount') { row.classList.remove('bad'); renderRemaining(); }
+  });
+  // tidy amounts to 0.00 when you leave the field
+  $('sLines').addEventListener('change', function (e) {
+    var row = e.target.closest('.split-line'); if (!row || e.target.dataset.f !== 'amount') return;
+    var c = toCents_(cleanAmt(e.target.value)); if (c === null || !(c > 0)) return;
+    e.target.value = SP.lines[+row.dataset.k].amount = centsField(c);
+  });
+  $('sTotal').addEventListener('change', function () {
+    var c = toCents_(cleanAmt($('sTotal').value)); if (c === null || !(c > 0)) return;
+    $('sTotal').value = SP.total = centsField(c);
+  });
+  $('sLines').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act]'); if (!b) return;
+    var row = b.closest('.split-line'), k = +row.dataset.k, line = SP.lines[k];
+    if (b.dataset.act === 'rm') { SP.lines.splice(k, 1); renderSplitLines(); return; }
+    if (b.dataset.act === 'rest') {
+      var chk = splitCheck(SP), v = (chk.cents[k] || 0) + chk.remaining;
+      line.amount = centsField(v); row.querySelector('[data-f="amount"]').value = line.amount; row.classList.remove('bad'); renderRemaining(); return;
+    }
+    if (b.dataset.act === 'cat') openPicker(line.category, function (v) {
+      line.category = v;
+      if (isIncome(v)) addForm.setFlow('Inflow');
+      var pv = row.querySelector('.pv'); pv.textContent = v.trim(); pv.classList.remove('placeholder'); row.classList.remove('bad'); $('sError').hidden = true;
+      renderSplitMeta();
+    });
+  });
+  $('sAddLine').addEventListener('click', function () {
+    if (SP.lines.length >= SPLIT_MAX_LINES) return;
+    SP.lines.push({ category: '', amount: '', memo: '' }); renderSplitLines();
+    var body = $('splitBody'); body.scrollTop = body.scrollHeight;
+  });
+  function splitDone() {
+    var msg = splitProblem(SP, true), err = $('sError');
+    if (msg) { err.textContent = msg; err.hidden = false; var bad = document.querySelector('#sLines .split-line.bad'); if (bad) keepVisible(bad); return; }
+    var chk = splitCheck(SP);
+    S.split = { total: centsField(chk.total), lines: SP.lines.map(function (l, i) { return { category: l.category, amount: centsField(chk.cents[i]), memo: String(l.memo || '').trim() }; }) };
+    $('amount').value = S.split.total; addForm.touched = true;
+    hidePlaceHint(); SP = null; closeSheet('splitWrap'); renderSplitSummary();
+    $('formError').hidden = true;
+  }
+  $('sDone').addEventListener('click', splitDone);
+  $('sDoneBottom').addEventListener('click', splitDone);
+  $('sCancel').addEventListener('click', function () { SP = null; closeSheet('splitWrap'); });
+  // Back to one category: keep the biggest line's category (ties go to the first line).
+  function unsplit(lines) {
+    var chk = checkSplit_(0, lines.map(function (l) { return cleanAmt(l.amount); })), best = -1;
+    lines.forEach(function (l, i) { if (l.category && (best < 0 || (chk.cents[i] || 0) > (chk.cents[best] || 0))) best = i; });
+    S.split = null; SP = null;
+    addForm.setCategory(best >= 0 ? lines[best].category : '', false);
+    renderSplitSummary();
+  }
+  $('sUnsplit').addEventListener('click', function () { var lines = SP ? SP.lines : []; if (SP && SP.total) $('amount').value = SP.total; closeSheet('splitWrap'); unsplit(lines); });
+  $('splitRemove').addEventListener('click', function () { unsplit(S.split ? S.split.lines : []); });
+  $('splitBtn').addEventListener('click', openSplit);
+  $('splitEdit').addEventListener('click', openSplit);
+  function renderSplitSummary() {
+    var on = !!S.split;
+    $('splitSummary').hidden = !on; $('categoryBtn').hidden = on; $('catBal').hidden = on; $('splitBtn').hidden = on;
+    $('saveBtn').querySelector('.btn-label').textContent = on ? 'Add ' + S.split.lines.length + ' transactions' : 'Add transaction';
+    if (!on) { $('splitSumList').innerHTML = ''; return; }
+    var n = S.split.lines.length, tc = toCents_(S.split.total);
+    $('splitSumList').innerHTML = S.split.lines.map(function (l, i) {
+      return '<li><span class="nm">' + esc(l.category.trim()) + '<small>' + esc(l.memo || splitTag_(i, n, tc)) + '</small></span><b class="amt">' + centsStr_(toCents_(l.amount)) + '</b></li>';
+    }).join('');
+  }
+  $('amount').addEventListener('input', function () {
+    if (!S.split) return;
+    var ok = toCents_(cleanAmt($('amount').value)) === toCents_(S.split.total);
+    $('splitSummary').classList.toggle('mismatch', !ok);
+  });
+  function submitSplit() {
+    var err = $('formError'); err.hidden = true;
+    var base = addForm.values();
+    var problem = !base.description ? 'Add a description.' : !base.account ? 'Pick an account.' : !base.date ? 'Pick a date.' : '';
+    var amtC = toCents_(cleanAmt($('amount').value)), totC = toCents_(S.split.total);
+    if (!problem && amtC !== totC) problem = 'The amount (' + (amtC === null ? 'blank' : centsStr_(amtC)) + ') no longer matches the split total of ' + centsStr_(totC) + '. Tap Edit split.';
+    if (!problem) problem = splitProblem(S.split, false);
+    if (problem) { err.textContent = problem; err.hidden = false; return; }
+    var tx = { date: base.date, description: base.description, account: base.account, flow: base.flow, total: S.split.total,
+               lines: S.split.lines.map(function (l) { return { category: l.category, amount: l.amount, memo: l.memo }; }), requestId: newRequestId() };
+    var loc = usableLoc(); if (loc) tx.loc = loc;
+    var btn = $('saveBtn'), label = 'Add ' + tx.lines.length + ' transactions'; addForm.busy(btn, true, 'Saving\u2026');
+    call('addSplitTransaction', tx).then(function (res) {
+      S.balances = res.balances; renderBalances(); renderRecent(res.recent);
+      if (res.places) S.places = res.places;
+      S.spendCache = {};
+      var added = res.added || [];
+      if (S.rec.loaded && added.length) {
+        S.rec.items.forEach(function (t) { t.row += added.length; });
+        S.rec.items = added.map(strip).concat(S.rec.items);
+        renderTxList();
+      } else if (S.rec.loaded) loadRecent(true);
+      toast((tx.flow === 'Inflow' ? '+' : '\u2212') + centsStr_(totC) + ' split into ' + tx.lines.length + ' transactions');
+      resetForm(); S.loc = null; locate();
+      label = 'Add transaction';
+    }).catch(function (e2) {
+      err.textContent = errMsg(e2, 'Could not save. Try again.'); err.hidden = false;
+    }).then(function () { addForm.busy(btn, false, S.split ? label : 'Add transaction'); });
+  }
+
+  /* ---------------- transaction rows (Add's short list + Recent tab) ---------------- */
+  function txRow(t, src, i) {
+    var inflow = t.flow === 'Inflow';
+    return '<li data-src="' + src + '" data-i="' + i + '">' +
+      '<button type="button" class="clr' + (t.cleared ? ' on' : '') + (t._busy ? ' busy' : '') + '" data-clr="1" aria-pressed="' + !!t.cleared + '" aria-label="' + (t.cleared ? 'Cleared' : 'Not cleared') + '">' + CHECK + '</button>' +
+      '<div class="grow"><div class="t1">' + esc(t.description) + '</div>' +
+      '<div class="t2">' + esc(t.category.trim()) + ' \u00B7 ' + esc(t.account) + (src === 'short' ? ' \u00B7 ' + fmtShortDate(t.date) : '') + '</div></div>' +
+      '<div class="amt ' + (inflow ? 'in' : 'out') + '">' + (inflow ? '+' : '\u2212') + money(t.amount).replace('-', '') + '</div></li>';
+  }
+  function renderRecent(list) {
+    S.short = list.map(strip);
+    renderShort();
+    var seen = {}; $('descList').innerHTML = (S.boot.memory || []).concat(list).filter(function (t) {
+      var k = t.description.toLowerCase(); if (seen[k]) return false; seen[k] = 1; return true;
+    }).map(function (t) { return '<option value="' + esc(t.description) + '">'; }).join('');
+  }
+  function renderShort() {
+    $('recentList').innerHTML = S.short.length ? S.short.map(function (t, i) { return txRow(t, 'short', i); }).join('') : '<li class="empty">No transactions yet</li>';
+  }
+  function renderTxList() {
+    var q = $('txSearch').value.trim().toLowerCase(), html = '', day = null, open = false;
+    var shown = 0;
+    S.rec.items.forEach(function (t, i) {
+      if (q && (t.description + ' ' + t.category + ' ' + t.account + ' ' + (+t.amount).toFixed(2)).toLowerCase().indexOf(q) < 0) return;
+      if (t.date !== day) {
+        if (open) html += '</ul>';
+        day = t.date; open = true;
+        html += '<div class="group-title"><span>' + esc(dayLabel(t.date)) + '</span></div><ul class="list tx-list">';
+      }
+      html += txRow(t, 'rec', i); shown++;
+    });
+    if (open) html += '</ul>';
+    if (!S.rec.loaded) html = '<div class="list"><div class="empty">Loading\u2026</div></div>';
+    else if (!shown) html = '<div class="list"><div class="empty">' + (q ? 'No loaded transactions match' : 'No transactions yet') + '</div></div>';
+    $('txList').innerHTML = html;
+    $('loadMore').hidden = !S.rec.hasMore;
+  }
+  function loadRecent(reset) {
+    if (S.rec.loading) return Promise.resolve();
+    S.rec.loading = true; $('loadMore').textContent = 'Loading\u2026'; $('loadMore').disabled = true;
+    if (reset) { S.rec.loaded = false; renderTxList(); }
+    var off = reset ? 0 : S.rec.items.length;
+    return call('getRecent', off, PAGE).then(function (res) {
+      var items = res.items.map(strip);
+      S.rec.items = reset ? items : S.rec.items.concat(items);
+      S.rec.hasMore = res.hasMore; S.rec.loaded = true; renderTxList();
+    }).catch(function (e) { S.rec.loaded = true; renderTxList(); toast(errMsg(e, 'Could not load transactions')); })
+      .then(function () { S.rec.loading = false; $('loadMore').textContent = 'Load more'; $('loadMore').disabled = false; });
+  }
+  function ensureRecent() { if (!S.rec.loaded) loadRecent(true); else renderTxList(); }
+  $('loadMore').addEventListener('click', function () { loadRecent(false); });
+  $('txSearch').addEventListener('input', renderTxList);
+
+  function arrFor(src) { return src === 'short' ? S.short : S.rec.items; }
+  // apply a server result to every copy of the transaction we hold
+  function applyEverywhere(orig, item) {
+    S.rec.items.forEach(function (t) { if (sameTx(t, orig)) { Object.assign(t, strip(item)); } });
+    S.short.forEach(function (t) { if (sameTx(t, orig)) { Object.assign(t, strip(item)); } });
+  }
+  function afterWrite(res) {
+    if (res.recent) renderRecent(res.recent);
+    if (res.balances) { S.balances = res.balances; renderBalances(); addForm.showCatBalance(); }
+    S.spendCache = {};
+    renderTxList();
+  }
+  function onTxListClick(e) {
+    var li = e.target.closest('li[data-src]'); if (!li) return;
+    var t = arrFor(li.dataset.src)[+li.dataset.i]; if (!t) return;
+    if (e.target.closest('[data-clr]')) toggleCleared(t); else openEdit(t);
+  }
+  $('txList').addEventListener('click', onTxListClick);
+  $('recentList').addEventListener('click', onTxListClick);
+
+  function toggleCleared(t) {
+    if (t._busy) return;
+    var orig = strip(t), want = !t.cleared;
+    var copies = S.rec.items.concat(S.short).filter(function (x) { return x === t || sameTx(x, orig); });
+    copies.forEach(function (x) { x._busy = true; x.cleared = want; });
+    renderTxList(); renderShort();
+    call('setCleared', orig, want).then(function (res) {
+      copies.forEach(function (x) { Object.assign(x, strip(res.item)); x._busy = false; });
+      afterWrite(res);
+      toast(want ? 'Marked cleared' : 'Marked not cleared');
+    }).catch(function (e) {
+      copies.forEach(function (x) { x._busy = false; x.cleared = orig.cleared; });
+      renderTxList(); renderShort();
+      toast(errMsg(e, 'Could not update'));
+    });
+  }
+
+  /* ---------------- edit sheet ---------------- */
+  function resetDelete() { var d = $('eDelete'); d.classList.remove('confirm'); d.textContent = 'Delete transaction'; clearTimeout(resetDelete._t); }
+  function openEdit(t) {
+    S.edit = { orig: strip(t) };
+    editForm.keepAccount = t.account;
+    editForm.fill(t);
+    $('eFormError').hidden = true; resetDelete();
+    $('eRowNote').textContent = 'Sheet row ' + t.row + ' \u00B7 changes are checked against the sheet before saving';
+    openSheet('editWrap');
+  }
+  function editFailed(e) {
+    var msg = errMsg(e, 'Could not save. Try again.'), err = $('eFormError');
+    err.innerHTML = esc(msg) + (/changed|refresh/i.test(msg) ? ' <button type="button" class="link" id="eReload">Refresh list</button>' : '');
+    err.hidden = false;
+    var r = $('eReload'); if (r) r.addEventListener('click', function () { closeSheet('editWrap'); refreshAll(); });
+  }
+  $('eCancel').addEventListener('click', function () { closeSheet('editWrap'); });
+  $('editForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!S.edit) return;
+    var orig = S.edit.orig, tx = editForm.values(), err = $('eFormError'); err.hidden = true;
+    var problem = editForm.problem(tx);
+    if (problem) { err.textContent = problem; err.hidden = false; return; }
+    var same = tx.date === orig.date && tx.description === orig.description && tx.category === orig.category && tx.account === orig.account &&
+      +tx.amount === +orig.amount && tx.flow === orig.flow;     // Cleared isn't editable here; the server keeps it
+    if (same) { closeSheet('editWrap'); return; }
+    var btn = $('eSave'); editForm.busy(btn, true, 'Saving\u2026');
+    call('updateTransaction', orig, tx).then(function (res) {
+      applyEverywhere(orig, res.item);
+      afterWrite(res); closeSheet('editWrap'); S.edit = null;
+      toast('Saved');
+    }).catch(editFailed).then(function () { editForm.busy(btn, false, 'Save changes'); });
+  });
+  $('eDelete').addEventListener('click', function () {
+    var d = $('eDelete');
+    if (!d.classList.contains('confirm')) {
+      d.classList.add('confirm'); d.textContent = 'Tap again to delete';
+      resetDelete._t = setTimeout(resetDelete, 4000); return;
+    }
+    resetDelete();
+    var orig = S.edit.orig; d.disabled = true; d.textContent = 'Deleting\u2026';
+    call('deleteTransaction', orig).then(function (res) {
+      S.rec.items = S.rec.items.filter(function (x) { return !sameTx(x, orig) && x.row !== res.row; });
+      S.rec.items.forEach(function (x) { if (x.row > res.row) x.row--; });
+      afterWrite(res); closeSheet('editWrap'); S.edit = null;
+      toast('Deleted');
+    }).catch(editFailed).then(function () { d.disabled = false; resetDelete(); });
+  });
+
+  /* ---------------- location auto-fill ("Remember places") ---------------- */
+  var LOC_ON = LS.get('rememberPlaces', true);
+  var HAS_GEO = !!(navigator.geolocation && typeof navigator.geolocation.getCurrentPosition === 'function');
+  function locate() {
+    if (!LOC_ON || !HAS_GEO || !S.boot) { S.locStatus = !HAS_GEO ? 'unsupported' : LOC_ON ? S.locStatus : 'off'; return; }
+    if (S.locStatus === 'locating' || S.locStatus === 'denied') return;   // don't nag after a "no"
+
+    if (S.loc && Date.now() - S.loc.at < 60000) { maybePlaceFill(); return; }
+    S.locStatus = 'locating'; renderSettings();
+    try {
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        S.loc = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: Math.round(pos.coords.accuracy || 9999), at: Date.now() };
+        S.locStatus = 'ok'; renderSettings(); maybePlaceFill();
+      }, function (err) {
+        S.locStatus = err && err.code === 1 ? 'denied' : err && err.code === 3 ? 'timeout' : 'unavailable'; renderSettings();
+      }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
+    } catch (e) { S.locStatus = 'unavailable'; renderSettings(); }
+  }
+  function usableLoc() {
+    if (!LOC_ON || !S.loc || Date.now() - S.loc.at > 10 * 60000) return null;
+    return { lat: S.loc.lat, lng: S.loc.lng, acc: S.loc.acc };
+  }
+  function maybePlaceFill() {
+    if (!LOC_ON || !S.loc || S.loc.acc > 250 || typeof matchPlace_ !== 'function') return;
+    if (addForm.touched || S.split || $('description').value.trim() || $('category').value) return;   // never overwrite what you typed
+    var m = matchPlace_(S.places, S.loc.lat, S.loc.lng, PLACE_OPTS);
+    if (!m) return;
+    var p = m.place;
+    S.autofill = { description: '', category: '', account: addForm.account };
+    $('description').value = p.d || '';
+    if (S.boot.types.indexOf(p.c) >= 0) addForm.setCategory(p.c, true);
+    if (p.a) addForm.setAccount(p.a);
+    $('placeHintText').innerHTML = 'At ' + esc(p.d || 'a saved place') + '? Filled <b>' + esc(String(p.c).trim()) + '</b>';
+    $('placeHint').hidden = false;
+  }
+  function hidePlaceHint() { $('placeHint').hidden = true; }
+  $('placeUndo').addEventListener('click', function () {
+    var a = S.autofill; if (!a) return hidePlaceHint();
+    $('description').value = a.description; addForm.setCategory(a.category, false); addForm.setFlow('Outflow');
+    if (a.account) addForm.setAccount(a.account);
+    addForm.touched = true; S.autofill = null; hidePlaceHint();
+  });
+  $('placeX').addEventListener('click', function () { S.autofill = null; hidePlaceHint(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && $('view-add').classList.contains('active')) { S.loc = null; locate(); }
+  });
+
+  var LOC_TEXT = {
+    idle: 'Location not requested yet.', locating: 'Finding your location\u2026', off: 'Off on this phone.',
+    unsupported: 'This browser doesn\'t offer location here, so the app works without it.',
+    denied: 'Location permission is blocked for this page. The app works normally without it.',
+    timeout: 'Couldn\'t get a location fix in time; will try again next time you open Add.',
+    unavailable: 'Location isn\'t available right now.'
+  };
+  function renderSettings() {
+    $('locToggle').checked = LOC_ON;
+    var st = S.locStatus === 'ok' && S.loc ? 'Location OK (\u00B1' + S.loc.acc + ' m).' : (LOC_TEXT[S.locStatus] || '');
+    if (!HAS_GEO) st = LOC_TEXT.unsupported; else if (!LOC_ON) st = LOC_TEXT.off;
+    $('locStatus').textContent = st;
+    var n = (S.places || []).length;
+    $('placeCount').innerHTML = '<b>' + n + '</b> saved place' + (n === 1 ? '' : 's');
+    $('forgetPlaces').disabled = !n;
+    $('keyWho').textContent = S.boot && S.boot.user ? 'Signed in as ' + S.boot.user.name + ' on this phone.' : 'Saved on this phone.';
+  }
+  $('settingsBtn').addEventListener('click', function () { renderSettings(); openSheet('setWrap'); });
+  $('setDone').addEventListener('click', function () { closeSheet('setWrap'); });
+  $('locToggle').addEventListener('change', function () {
+    LOC_ON = $('locToggle').checked; LS.set('rememberPlaces', LOC_ON);
+    if (!LOC_ON) { S.loc = null; S.locStatus = 'off'; hidePlaceHint(); } else { S.locStatus = 'idle'; locate(); }
+    renderSettings();
+  });
+  function resetForget() { var b = $('forgetPlaces'); b.classList.remove('confirm'); b.textContent = 'Forget saved places'; clearTimeout(resetForget._t); }
+  $('forgetPlaces').addEventListener('click', function () {
+    var b = $('forgetPlaces');
+    if (!b.classList.contains('confirm')) { b.classList.add('confirm'); b.textContent = 'Tap again to forget all places'; resetForget._t = setTimeout(resetForget, 4000); return; }
+    resetForget(); b.disabled = true;
+    call('forgetPlaces').then(function () { S.places = []; hidePlaceHint(); renderSettings(); toast('Saved places forgotten'); })
+      .catch(function (e) { b.disabled = false; toast(errMsg(e, 'Could not forget places')); });
+  });
+
+  /* ---------------- balances ---------------- */
+  function renderBalances() {
+    var q = $('balSearch').value.trim().toLowerCase();
+    var list = S.balances.filter(function (b) {
+      if (q && b.name.toLowerCase().indexOf(q) < 0 && (b.group || '').toLowerCase().indexOf(q) < 0) return false;
+      if (S.filter === 'neg') return b.balance < 0;
+      if (S.filter === 'low') return b.balance >= 0 && b.balance < 25;
+      return true;
+    });
+    var total = S.balances.reduce(function (s, b) { return s + b.balance; }, 0);
+    var negs = S.balances.filter(function (b) { return b.balance < 0; });
+    $('balTotal').textContent = money(total, false);
+    $('balNeg').textContent = negs.length ? negs.length + ' \u00B7 ' + money(negs.reduce(function (s, b) { return s + b.balance; }, 0), false) : 'None';
+    $('balNeg').className = 'stat-value ' + (negs.length ? 'neg' : 'pos');
+
+    if (!list.length) { $('balList').innerHTML = '<div class="list"><div class="empty">No matching categories</div></div>'; return; }
+    // negatives float to the top, then group order as in the sheet
+    var order = [], byGroup = {};
+    var negList = list.filter(function (b) { return b.balance < 0; });
+    list.filter(function (b) { return b.balance >= 0; }).forEach(function (b) {
+      var g = b.group || 'Other'; if (!byGroup[g]) { byGroup[g] = []; order.push(g); } byGroup[g].push(b);
+    });
+    var row = function (b) {
+      var cls = b.balance < 0 ? 'neg' : (b.balance < 25 ? 'low' : '');
+      var pill = b.balance < 0 ? '<span class="pill neg">Overspent</span>' : (b.balance < 25 ? '<span class="pill low">Low</span>' : '');
+      return '<li class="' + cls + '"><div class="grow"><div class="t1">' + esc(b.name.trim()) + pill + '</div></div><div class="amt">' + money(b.balance) + '</div></li>';
+    };
+    var html = '';
+    if (negList.length) html += '<div class="group-title"><span>Needs attention</span></div><ul class="list bal">' + negList.map(row).join('') + '</ul>';
+    order.forEach(function (g) {
+      var sum = byGroup[g].reduce(function (s, b) { return s + b.balance; }, 0);
+      html += '<div class="group-title"><span>' + esc(g) + '</span><span>' + money(sum, false) + '</span></div><ul class="list bal">' + byGroup[g].map(row).join('') + '</ul>';
+    });
+    $('balList').innerHTML = html;
+  }
+  $('balSearch').addEventListener('input', renderBalances);
+  document.querySelectorAll('#balFilter .chip').forEach(function (c) {
+    c.addEventListener('click', function () {
+      S.filter = c.dataset.f;
+      document.querySelectorAll('#balFilter .chip').forEach(function (x) { x.classList.toggle('active', x === c); });
+      renderBalances();
+    });
+  });
+
+  /* ---------------- charts ---------------- */
+  function loadSpending() {
+    var incl = $('inclSavings').checked;
+    var key = S.year + '-' + S.month + '-' + incl;
+    $('monthLabel').textContent = MONTHS[S.month - 1] + ' ' + S.year;
+    var p = S.spendCache[key] ? Promise.resolve(S.spendCache[key]) : call('getSpending', S.year, S.month, incl);
+    p.then(function (d) { S.spendCache[key] = d; renderSpending(d); }).catch(function (e) { toast((e && e.message) || 'Could not load spending'); });
+  }
+  function shiftMonth(n) {
+    var m = S.month + n, y = S.year;
+    if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; }
+    S.month = m; S.year = y; loadSpending();
+  }
+  $('prevMonth').addEventListener('click', function () { shiftMonth(-1); });
+  $('nextMonth').addEventListener('click', function () { shiftMonth(1); });
+  $('inclSavings').addEventListener('change', loadSpending);
+
+  function renderSpending(d) {
+    $('kSpent').textContent = money(d.total, false);
+    $('kIncome').textContent = money(d.income, false);
+    var net = d.income - d.total;
+    $('kNet').textContent = (net >= 0 ? '+' : '') + money(net, false);
+    $('kNet').className = 'stat-value ' + (net >= 0 ? 'pos' : 'neg');
+
+    var cats = d.byCategory.filter(function (c) { return c.amount > 0; });
+    var top = cats.slice(0, 8);
+    var rest = cats.slice(8).reduce(function (s, c) { return s + c.amount; }, 0);
+    if (rest > 0) top.push({ name: 'Everything else', amount: Math.round(rest * 100) / 100 });
+    var colors = top.map(function (_, i) { return i === 8 ? PALETTE[10] : PALETTE[i]; });
+    $('donutCenter').innerHTML = '<div><b>' + money(d.total, false) + '</b><span>spent</span></div>';
+
+    if (window.Chart) {
+      Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+      Chart.defaults.color = '#9aa3b5';
+      Chart.defaults.borderColor = 'rgba(255,255,255,.08)';
+      if (S.charts.donut) S.charts.donut.destroy();
+      S.charts.donut = new Chart($('donut'), {
+        type: 'doughnut',
+        data: { labels: top.map(function (c) { return c.name.trim(); }), datasets: [{ data: top.map(function (c) { return c.amount; }), backgroundColor: colors, borderWidth: 2, borderColor: '#181b22', hoverOffset: 6 }] },
+        options: { cutout: '68%', maintainAspectRatio: false, animation: { duration: 400 }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return ' ' + c.label + ': ' + money(c.raw); } } } } }
+      });
+      if (S.charts.trend) S.charts.trend.destroy();
+      S.charts.trend = new Chart($('trend'), {
+        type: 'bar',
+        data: {
+          labels: d.trend.map(function (t) { return t.label; }),
+          datasets: [
+            { label: 'Spent', data: d.trend.map(function (t) { return t.spend; }), backgroundColor: d.trend.map(function (t, i) { return i === d.trend.length - 1 ? '#4fd1b5' : '#1f9e8f'; }), borderRadius: 6, maxBarThickness: 18 },
+            { label: 'Income', data: d.trend.map(function (t) { return t.income; }), type: 'line', borderColor: '#9fd8cb', backgroundColor: '#9fd8cb', pointRadius: 2.5, tension: .35, borderWidth: 2.5 }
+          ]
+        },
+        options: {
+          maintainAspectRatio: false, animation: { duration: 400 },
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return ' ' + c.dataset.label + ': ' + money(c.raw, false); } } } },
+          scales: {
+            x: { grid: { display: false }, border: { color: '#2a2f3a' }, ticks: { color: '#9aa3b5', font: { size: 10 }, maxRotation: 0, autoSkip: false } },
+            y: { grid: { color: 'rgba(255,255,255,.08)' }, border: { display: false }, ticks: { color: '#9aa3b5', font: { size: 10 }, callback: function (v) { return '$' + (v >= 1000 ? (v / 1000) + 'k' : v); } } }
+          }
+        }
+      });
+    }
+
+    var max = cats.length ? cats[0].amount : 1;
+    $('catBars').innerHTML = cats.length ? cats.map(function (c, i) {
+      var col = i < 8 ? PALETTE[i] : PALETTE[10];
+      var pct = d.total > 0 ? Math.round(c.amount / d.total * 100) : 0;
+      return '<li><div class="top"><span class="nm"><i class="sw" style="background:' + col + '"></i><span class="t1">' + esc(c.name.trim()) + '</span></span>' +
+        '<span><span class="t2">' + pct + '%&nbsp;&nbsp;</span><b class="amt">' + money(c.amount) + '</b></span></div>' +
+        '<div class="bar"><i style="width:' + Math.max(2, c.amount / max * 100) + '%;background:' + col + '"></i></div></li>';
+    }).join('') : '<li class="empty">No spending this month</li>';
+  }
+
+  /* ---------------- boot ---------------- */
+  var LOADING_HTML = $('loading').innerHTML;
+  function boot() {
+    if (!API_READY || !getKey()) { showKeyScreen(); return Promise.resolve(); }
+    $('loading').innerHTML = LOADING_HTML;
+    return call('getBootstrap').then(function (b) {
+      hideKeyScreen();
+      S.boot = b; S.balances = b.balances; S.places = b.places || [];
+      var p = b.today.split('-'); S.year = +p[0]; S.month = +p[1];
+      var hour = new Date().getHours();
+      $('hello').textContent = (hour < 12 ? 'Good morning, ' : hour < 18 ? 'Good afternoon, ' : 'Good evening, ') + b.user.name;
+      resetForm(); renderRecent(b.recent); renderBalances();
+      $('loading').classList.add('hide');
+      var h = (location.hash || '').slice(1);
+      if (h === 'balances' || h === 'charts' || h === 'recent') show(h); else locate();
+    }).catch(function (e) {
+      if (e && e.code === 'unauthorized') { keyBusy(false); return; }   // key screen is showing
+      $('loading').innerHTML = '<div class="empty">' + esc(errMsg(e, 'Could not load')) +
+        '<br><br><button type="button" class="secondary" id="retryBoot">Try again</button></div>';
+      var rb = $('retryBoot'); if (rb) rb.addEventListener('click', function () { boot(); });
+    });
+  }
+  function refreshAll() {
+    S.spendCache = {};
+    return boot().then(function () {
+      if (S.rec.loaded) loadRecent(true);
+      if ($('view-charts').classList.contains('active')) loadSpending();
+    });
+  }
+  $('refreshBtn').addEventListener('click', function () { refreshAll().then(function () { toast('Up to date'); }); });
+
+  $('keyForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var k = cleanKey($('keyInput').value);
+    if (k.length < 32) { $('keyError').textContent = 'That doesn\'t look like a full access key. Paste the whole key.'; $('keyError').hidden = false; return; }
+    $('keyError').hidden = true; keyBusy(true); setKey(k);
+    $('loading').classList.remove('hide');
+    boot();
+  });
+  function resetForgetKey() { var b = $('forgetKey'); b.classList.remove('confirm'); b.textContent = 'Remove access key from this phone'; clearTimeout(resetForgetKey._t); }
+  $('forgetKey').addEventListener('click', function () {
+    var b = $('forgetKey');
+    if (!b.classList.contains('confirm')) { b.classList.add('confirm'); b.textContent = 'Tap again to remove the key'; resetForgetKey._t = setTimeout(resetForgetKey, 4000); return; }
+    resetForgetKey(); setKey(''); closeSheet('setWrap'); S.boot = null;
+    $('loading').classList.remove('hide'); showKeyScreen();
+  });
+  window.__ynab = { show: show, S: S, addForm: addForm, editForm: editForm, openPicker: openPicker, openEdit: openEdit,
+                    openSheet: openSheet, closeSheet: closeSheet, renderBalances: renderBalances, renderSettings: renderSettings,
+                    locate: locate, maybePlaceFill: maybePlaceFill, openSplit: openSplit, SP: function () { return SP; },
+                    syncViewport: syncViewport };
+  boot();
+
+  // App shell cache for the home-screen app (sw.js never touches API calls).
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+  }
+})();
+</script>
+</body>
+</html>
