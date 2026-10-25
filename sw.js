@@ -3,7 +3,7 @@
    Apps Script API lives on script.google.com (another origin), so its requests go straight to the network.
    Shell files are fetched network-first (a new deploy shows up on the next open) with the cache as a
    fallback when offline. Bump SHELL_VERSION when the list changes. */
-var SHELL_VERSION = 'ynab26-shell-v1';
+var SHELL_VERSION = 'ynab26-shell-v2';
 var SHELL = [
   './', 'index.html', 'config.js', 'lib.js', 'vendor/chart.umd.min.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'

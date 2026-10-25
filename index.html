@@ -223,7 +223,18 @@ body.noscroll{overflow:hidden;position:fixed;left:0;right:0;width:100%}
 .set-text{display:flex;flex-direction:column;gap:3px;text-transform:none;letter-spacing:0}
 .set-text b{font-size:16px;color:var(--ink)}
 .set-text small{font-size:13px;color:var(--muted);font-weight:400;line-height:1.35}
-#description::-webkit-calendar-picker-indicator,#eDescription::-webkit-calendar-picker-indicator{display:none!important;opacity:0}
+/* description suggestions: our own dropdown under the input (Android Chrome draws a native datalist
+   as a see-through popup above the field, on top of the amount and the location chip) */
+.ac{position:relative}
+.ac.open{z-index:60}
+.ac input{scroll-margin-top:96px;scroll-margin-bottom:24px}
+.ac-list{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:60;margin:0;padding:4px 0;list-style:none;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 36px rgba(0,0,0,.6),0 2px 6px rgba(0,0,0,.4);max-height:284px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.ac-list[hidden]{display:none}
+.ac-opt{display:flex;align-items:center;width:100%;min-height:46px;padding:0 14px;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);text-align:left;font-size:16px;cursor:pointer;touch-action:pan-y}
+.ac-opt:last-child{border-bottom:0}
+.ac-opt span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac-opt mark{background:rgba(43,179,154,.35);color:inherit;border-radius:3px;padding:0 1px}
+.ac-opt:active,.ac-opt.act{background:var(--accent-soft)}
 .set-status{font-size:13px;color:var(--muted);padding:2px 2px 0}
 .set-status b{color:var(--ink)}
 
@@ -351,11 +362,13 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
           </div>
 
           <div class="card fields">
-            <label class="field">
-              <span>Description</span>
-              <input id="description" list="descList" placeholder="Walmart, Costco gas&#8230;" maxlength="200">
-              <datalist id="descList"></datalist>
-            </label>
+            <div class="field">
+              <span><label for="description">Description</label></span>
+              <div class="ac" id="descAc">
+                <input id="description" placeholder="Walmart, Costco gas&#8230;" maxlength="200" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="descSug">
+                <div class="ac-list" id="descSug" role="listbox" aria-label="Past descriptions" hidden></div>
+              </div>
+            </div>
 
             <div class="field">
               <div class="field-head"><span>Category</span><button type="button" class="link mini" id="splitBtn" aria-haspopup="dialog">Split</button></div>
@@ -485,7 +498,7 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
             <div class="hint" id="eFlowHint">Money going out</div>
           </div>
           <div class="card fields">
-            <label class="field"><span>Description</span><input id="eDescription" list="descList" maxlength="200"></label>
+            <div class="field"><span><label for="eDescription">Description</label></span><div class="ac" id="eDescAc"><input id="eDescription" maxlength="200" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="eDescSug"><div class="ac-list" id="eDescSug" role="listbox" aria-label="Past descriptions" hidden></div></div></div>
             <div class="field">
               <span>Category</span>
               <button type="button" class="picker-btn" id="eCategoryBtn" aria-haspopup="dialog"><span class="pv placeholder">Choose a category</span></button>
@@ -819,6 +832,75 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
   $('catOptions').addEventListener('click', function (e) { var b = e.target.closest('.opt'); if (b) pickOption(+b.dataset.i); });
   $('catCancel').addEventListener('click', function () { closeSheet('catWrap'); });
 
+  /* ---------------- description suggestions ----------------
+     Our own dropdown under the input instead of a native <datalist>, which Android Chrome draws as a
+     see-through popup above the field. Source: S.descs (past descriptions, see renderRecent). Prefix
+     matches first, then substring matches; nothing for an empty input or an exact match. */
+  function matchDescs(v) {
+    var q = v.trim().toLowerCase(); if (!q) return [];
+    var pre = [], mid = [];
+    (S.descs || []).forEach(function (d) {
+      var k = d.toLowerCase();
+      if (k === q) return;
+      var i = k.indexOf(q);
+      if (i === 0) pre.push(d); else if (i > 0) mid.push(d);
+    });
+    return pre.concat(mid).slice(0, 30);
+  }
+  function descSuggest(input, list, onPick) {
+    var wrap = list.parentNode, items = [], act = -1, blurT = 0;
+    function close() {
+      list.hidden = true; list.innerHTML = ''; items = []; act = -1;
+      wrap.classList.remove('open'); input.setAttribute('aria-expanded', 'false');
+    }
+    // keep the list on screen above the keyboard: scroll the input up if the list's bottom is hidden
+    function keepVisible() {
+      if (list.hidden) return;
+      var vv = window.visualViewport, bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+      if (list.getBoundingClientRect().bottom > bottom - 4) input.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
+    function render() {
+      items = matchDescs(input.value); act = -1;
+      if (!items.length || document.activeElement !== input) return close();
+      var q = input.value.trim().toLowerCase();
+      list.innerHTML = items.map(function (d, i) {
+        return '<button type="button" class="ac-opt" role="option" tabindex="-1" data-i="' + i + '"><span>' + hl(d, q) + '</span></button>';
+      }).join('');
+      list.scrollTop = 0; list.hidden = false;
+      wrap.classList.add('open'); input.setAttribute('aria-expanded', 'true');
+      keepVisible();
+    }
+    function pick(i) {
+      var v = items[i]; if (v === undefined) return;
+      input.value = v; close(); onPick(v);
+    }
+    function mark(i) {
+      act = (i + items.length) % items.length;
+      list.querySelectorAll('.ac-opt').forEach(function (b, k) { b.classList.toggle('act', k === act); });
+      var b = list.children[act]; if (b) b.scrollIntoView({ block: 'nearest' });
+    }
+    input.addEventListener('input', render);
+    input.addEventListener('focus', function () {
+      clearTimeout(blurT); render();
+      setTimeout(function () { if (document.activeElement === input) { if (list.hidden) input.scrollIntoView({ block: 'nearest' }); else keepVisible(); } }, 350);
+    });
+    input.addEventListener('blur', function () { clearTimeout(blurT); blurT = setTimeout(close, 150); });
+    input.addEventListener('keydown', function (e) {
+      if (list.hidden) return;
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }   // close the list, not the sheet
+      else if (e.key === 'ArrowDown') { e.preventDefault(); mark(act + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); mark(act - 1); }
+      else if (e.key === 'Enter') { if (act >= 0) { e.preventDefault(); pick(act); } else close(); }
+    });
+    // pointerdown/mousedown preventDefault keeps focus in the input, so blur can't close the list
+    // before the tap lands; the pick itself happens on click so a finger can still scroll the list.
+    ['pointerdown', 'mousedown'].forEach(function (t) { list.addEventListener(t, function (e) { e.preventDefault(); }); });
+    list.addEventListener('click', function (e) { var b = e.target.closest('.ac-opt'); if (b) pick(+b.dataset.i); });
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', function () { setTimeout(keepVisible, 50); });
+    if (input.form) input.form.addEventListener('submit', close, true);
+    return { close: close, refresh: function () { if (!list.hidden) render(); } };
+  }
+
   /* ---------------- shared form controller (Add = '', Edit = 'e') ---------------- */
   function Form(p) {
     var self = this;
@@ -830,6 +912,7 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
     });
     this.el('description').addEventListener('change', function () { self.autofillFromDescription(); });
     this.el('description').addEventListener('input', function () { self.touched = true; });
+    this.suggest = descSuggest(this.el('description'), this.el('descSug'), function () { self.touched = true; self.autofillFromDescription(); });
   }
   Form.prototype.setFlow = function (f) {
     this.flow = f;
@@ -1131,9 +1214,9 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
   function renderRecent(list) {
     S.short = list.map(strip);
     renderShort();
-    var seen = {}; $('descList').innerHTML = (S.boot.memory || []).concat(list).filter(function (t) {
-      var k = t.description.toLowerCase(); if (seen[k]) return false; seen[k] = 1; return true;
-    }).map(function (t) { return '<option value="' + esc(t.description) + '">'; }).join('');
+    var seen = {}; S.descs = (S.boot.memory || []).concat(list).filter(function (t) {
+      var k = t.description.toLowerCase(); if (!k || seen[k]) return false; seen[k] = 1; return true;
+    }).map(function (t) { return t.description; });
   }
   function renderShort() {
     $('recentList').innerHTML = S.short.length ? S.short.map(function (t, i) { return txRow(t, 'short', i); }).join('') : '<li class="empty">No transactions yet</li>';
