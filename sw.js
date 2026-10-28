@@ -1,9 +1,9 @@
 /* YNAB 26 service worker: caches the app shell only, so the app opens instantly and offline.
    It never touches API calls: only same-origin GET requests for the files below are handled, and the
    Apps Script API lives on script.google.com (another origin), so its requests go straight to the network.
-   Shell files are fetched network-first (a new deploy shows up on the next open) with the cache as a
-   fallback when offline. Bump SHELL_VERSION when the list changes. */
-var SHELL_VERSION = 'ynab26-shell-v2';
+   Shell files are served cache-first (no network wait when the app opens) and refreshed in the background,
+   so a new deploy shows up on the open after next. Bump SHELL_VERSION when the list changes. */
+var SHELL_VERSION = 'ynab26-shell-v3';
 var SHELL = [
   './', 'index.html', 'config.js', 'lib.js', 'vendor/chart.umd.min.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'
@@ -32,16 +32,21 @@ self.addEventListener('fetch', function (e) {
   if (req.method !== 'GET') return;                 // API calls are POSTs: never intercepted
   var url = new URL(req.url);
   if (!isShell(url)) return;                        // other origins (the API) and other files: browser default
+  var key = req.url.split('#')[0];
+  var update = fetch(req).then(function (res) {
+    if (res && res.ok) {
+      var copy = res.clone();
+      return caches.open(SHELL_VERSION).then(function (c) { return c.put(key, copy); }).then(function () { return res; });
+    }
+    return res;
+  });
   e.respondWith(
-    fetch(req).then(function (res) {
-      if (res && res.ok) {
-        var copy = res.clone();
-        caches.open(SHELL_VERSION).then(function (c) { c.put(req.url.split('#')[0], copy); });
+    caches.match(req, { ignoreSearch: true }).then(function (hit) {
+      if (hit) {
+        e.waitUntil(update.catch(function () {}));        // refresh the copy for next time
+        return hit;
       }
-      return res;
-    }).catch(function () {
-      return caches.match(req, { ignoreSearch: true }).then(function (hit) {
-        if (hit) return hit;
+      return update.catch(function () {
         return (req.mode === 'navigate' ? caches.match('./') : Promise.resolve(null)).then(function (page) {
           return page || Response.error();
         });

@@ -171,6 +171,18 @@ main{padding:0 16px calc(96px + var(--safe-b))}
 .clr.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .clr.on svg{opacity:1}
 .clr.busy{opacity:.5}
+/* transactions still being sent to the sheet (outbox) */
+.list li.saving{cursor:default;background:linear-gradient(var(--warn-soft),var(--warn-soft)),var(--card)}
+.list li.saving .t1,.list li.saving .amt{opacity:.75}
+.pend-ic{flex:none;width:30px;height:30px;display:grid;place-items:center}
+.pend-ic .spinner{width:16px;height:16px;border-color:rgba(240,169,59,.35);border-top-color:var(--warn)}
+.pend-ic b{width:26px;height:26px;border-radius:50%;background:var(--neg-strong);color:#fff;display:grid;place-items:center;font-size:15px}
+.list li.saving.failed{background:linear-gradient(var(--neg-soft),var(--neg-soft)),var(--card)}
+.list li.saving.failed .t2{white-space:normal;color:var(--neg)}
+.pend-act{display:flex;gap:6px;margin-top:2px}
+.pend-act .link{padding:6px 10px 6px 0;min-height:36px}
+.view.refreshing .card,.view.refreshing canvas{transition:opacity .2s}
+#view-charts.refreshing canvas,#view-charts.refreshing #catBars{opacity:.55}
 .amt.out{color:var(--ink)}
 .acct-tag{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:#262b35;color:var(--muted);border-radius:6px;padding:1px 5px;margin-left:4px;vertical-align:1px}
 
@@ -608,7 +620,8 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
   var CHECK = '<svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var LS = {
     get: function (k, d) { try { var v = localStorage.getItem('ynab26.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
-    set: function (k, v) { try { localStorage.setItem('ynab26.' + k, JSON.stringify(v)); } catch (e) {} }
+    set: function (k, v) { try { localStorage.setItem('ynab26.' + k, JSON.stringify(v)); } catch (e) {} },
+    del: function (k) { try { localStorage.removeItem('ynab26.' + k); } catch (e) {} }
   };
 
   /* ---------------- API client ----------------
@@ -624,6 +637,7 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
   function getKey() { try { return localStorage.getItem(KEY_LS) || ''; } catch (e) { return ''; } }
   function setKey(k) { try { if (k) localStorage.setItem(KEY_LS, k); else localStorage.removeItem(KEY_LS); } catch (e) {} }
   function apiError(msg, code) { var e = new Error(msg); e.code = code || ''; return e; }
+  var inflight = 0;      // calls waiting on the server (tests wait for 0)
   function call(fn) {
     var args = Array.prototype.slice.call(arguments, 1);
     if (!API_READY) return Promise.reject(apiError('This copy of the app is not connected to the budget yet (API_URL in config.js).', 'config'));
@@ -631,6 +645,7 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
     if (!key) { showKeyScreen(); return Promise.reject(apiError('Enter your access key first.', 'unauthorized')); }
     var ctl = typeof AbortController === 'function' ? new AbortController() : null;
     var timer = ctl && setTimeout(function () { ctl.abort(); }, API_TIMEOUT_MS);
+    inflight++;
     return fetch(API_URL, {
       method: 'POST', body: JSON.stringify({ key: key, action: fn, args: args }),
       redirect: 'follow', credentials: 'omit', cache: 'no-store', signal: ctl ? ctl.signal : undefined
@@ -645,12 +660,37 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
       if (j && j.ok === true) return j.result;
       var err = j && j.error ? String(j.error) : 'Server error';
       if (err === 'unauthorized') {
-        setKey('');
+        setKey(''); clearSaved();
         showKeyScreen('That access key was not accepted. Check it and try again.');
         throw apiError('Your access key was not accepted.', 'unauthorized');
       }
       throw apiError(err, 'server');
-    }).then(function (v) { clearTimeout(timer); return v; }, function (e) { clearTimeout(timer); throw e; });
+    }).then(function (v) { clearTimeout(timer); inflight--; return v; }, function (e) { clearTimeout(timer); inflight--; throw e; });
+  }
+
+  /* ---------------- saved copy (opens instantly) ----------------
+     The last good bootstrap, the first Recent page and recent Spending months are kept in localStorage,
+     tagged with a hash of the access key, and shown at once on the next open while fresh data loads.
+     The key itself is never stored here; a different or rejected key never sees the saved copy. */
+  function keyHash() {
+    var k = getKey(), h = 5381, h2 = 52711;
+    for (var i = 0; i < k.length; i++) { var c = k.charCodeAt(i); h = ((h * 33) ^ c) >>> 0; h2 = ((h2 * 31) + c) >>> 0; }
+    return k ? 'k' + k.length + '.' + h.toString(36) + h2.toString(36) : '';
+  }
+  function clearSaved() { LS.del('cache'); LS.del('spend'); S.spendCache = {}; }
+  function readSaved() {
+    var c = LS.get('cache', null);
+    return c && c.v === 1 && c.kh && c.kh === keyHash() && c.boot && c.boot.user ? c : null;
+  }
+  function saveCache() {
+    if (!S.boot || !getKey()) return;
+    var b = Object.assign({}, S.boot, { balances: S.balances, places: S.places, recent: S.short.map(strip), page: null });
+    LS.set('cache', { v: 1, kh: keyHash(), at: Date.now(), boot: b,
+      page: S.rec.loaded ? { items: S.rec.items.slice(0, PAGE).map(strip), hasMore: S.rec.hasMore || S.rec.items.length > PAGE } : null });
+  }
+  function localToday() {
+    var d = new Date(), z = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate());
   }
 
   /* ---------------- access key screen ---------------- */
@@ -1008,22 +1048,8 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
     var problem = addForm.problem(tx);
     if (problem) { err.textContent = problem; err.hidden = false; return; }
     var loc = usableLoc(); if (loc) tx.loc = loc;
-    var btn = $('saveBtn'); addForm.busy(btn, true, 'Saving\u2026');
-    call('addTransaction', tx).then(function (res) {
-      S.balances = res.balances; renderBalances(); renderRecent(res.recent);
-      if (res.places) S.places = res.places;
-      S.spendCache = {};
-      // the new row went in at the top, so everything already loaded moved down one row
-      if (S.rec.loaded && res.recent[0]) {
-        S.rec.items.forEach(function (t) { t.row++; });
-        S.rec.items.unshift(strip(res.recent[0]));
-        renderTxList();
-      }
-      toast((tx.flow === 'Inflow' ? '+' : '\u2212') + money(+tx.amount) + ' \u00B7 ' + tx.category.trim() + ' added');
-      resetForm(); S.loc = null; locate();
-    }).catch(function (e2) {
-      err.textContent = errMsg(e2, 'Could not save. Try again.'); err.hidden = false;
-    }).then(function () { addForm.busy(btn, false, 'Add transaction'); });
+    queueAdd('tx', tx, { description: tx.description, category: tx.category, account: tx.account, amount: tx.amount, flow: tx.flow, date: tx.date },
+      (tx.flow === 'Inflow' ? '+' : '\u2212') + money(+tx.amount) + ' \u00B7 ' + tx.category.trim() + ' added');
   });
 
   function newRequestId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
@@ -1183,23 +1209,104 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
     var tx = { date: base.date, description: base.description, account: base.account, flow: base.flow, total: S.split.total,
                lines: S.split.lines.map(function (l) { return { category: l.category, amount: l.amount, memo: l.memo }; }), requestId: newRequestId() };
     var loc = usableLoc(); if (loc) tx.loc = loc;
-    var btn = $('saveBtn'), label = 'Add ' + tx.lines.length + ' transactions'; addForm.busy(btn, true, 'Saving\u2026');
-    call('addSplitTransaction', tx).then(function (res) {
-      S.balances = res.balances; renderBalances(); renderRecent(res.recent);
-      if (res.places) S.places = res.places;
-      S.spendCache = {};
-      var added = res.added || [];
-      if (S.rec.loaded && added.length) {
-        S.rec.items.forEach(function (t) { t.row += added.length; });
-        S.rec.items = added.map(strip).concat(S.rec.items);
-        renderTxList();
-      } else if (S.rec.loaded) loadRecent(true);
-      toast((tx.flow === 'Inflow' ? '+' : '\u2212') + centsStr_(totC) + ' split into ' + tx.lines.length + ' transactions');
-      resetForm(); S.loc = null; locate();
-      label = 'Add transaction';
-    }).catch(function (e2) {
-      err.textContent = errMsg(e2, 'Could not save. Try again.'); err.hidden = false;
-    }).then(function () { addForm.busy(btn, false, S.split ? label : 'Add transaction'); });
+    queueAdd('split', tx, { description: tx.description, category: 'Split into ' + tx.lines.length, account: tx.account, amount: centsField(totC), flow: tx.flow, date: tx.date },
+      (tx.flow === 'Inflow' ? '+' : '\u2212') + centsStr_(totC) + ' split into ' + tx.lines.length + ' transactions');
+  }
+
+  /* ---------------- outbox: adds save in the background ----------------
+     Submitting clears the form at once and shows the transaction as "Saving…" at the top of the lists.
+     Items live in localStorage until the server confirms them, so closing the app or losing signal never
+     loses one; they go out one at a time, oldest first. Each keeps its requestId, and the server ignores a
+     requestId it has already saved (for 6 hours), so a retry after a timeout can never add it twice. */
+  var OB = LS.get('outbox', []); if (!Array.isArray(OB)) OB = [];
+  var OB_MAX_AGE = 5.5 * 3600e3;          // the server remembers requestIds for 6 h
+  var obRunning = false, writeSeq = 0;
+  function saveOB() { LS.set('outbox', OB); }
+  function myOB() { var kh = keyHash(); return OB.filter(function (o) { return o.kh === kh; }); }
+  function findOB(id) { return OB.filter(function (o) { return o.id === id; })[0]; }
+  function dropOB(id) { OB = OB.filter(function (o) { return o.id !== id; }); saveOB(); }
+  function queueAdd(kind, tx, view, msg) {
+    OB.push({ id: tx.requestId, kh: keyHash(), kind: kind, tx: tx, view: view, toast: msg, at: Date.now(), state: 'saving' });
+    saveOB();
+    resetForm(); S.loc = null; locate();
+    renderPending(); runOutbox();
+  }
+  // retryNet: also re-send items that failed only because the network dropped (on open, resume, back online)
+  function runOutbox(retryNet) {
+    if (retryNet === true) {
+      var again = myOB().filter(function (o) { return o.state === 'failed' && o.net && !o.old; });
+      again.forEach(function (o) { o.state = 'saving'; o.error = ''; });
+      if (again.length) { saveOB(); renderPending(); }
+    }
+    if (obRunning || !S.boot || !getKey()) return;
+    var next = myOB().filter(function (o) { return o.state === 'saving'; })[0];
+    if (!next) return;
+    if (!next.forced && Date.now() - next.at > OB_MAX_AGE) {
+      next.state = 'failed'; next.old = true;
+      next.error = 'Not confirmed for hours. Check Recent first: if it is not there, tap Retry.';
+      saveOB(); renderPending(); return runOutbox();
+    }
+    obRunning = true; writeSeq++;
+    call(next.kind === 'split' ? 'addSplitTransaction' : 'addTransaction', next.tx).then(function (res) {
+      dropOB(next.id); writeSeq++;
+      applyAdded(next, res);
+      toast(next.toast);
+      return true;
+    }, function (e) {
+      if (e && e.code === 'unauthorized') return false;    // stays queued; the key screen is showing
+      var o = findOB(next.id);
+      if (o) { o.state = 'failed'; o.error = errMsg(e, 'Could not save.'); o.net = !!e && (e.code === 'network' || e.code === 'bad_reply'); saveOB(); }
+      renderPending();
+      toast('Not saved yet \u2014 tap Retry');
+      return false;
+    }).then(function (more) { obRunning = false; if (more) runOutbox(); });
+  }
+  function applyAdded(o, res) {
+    S.balances = res.balances; renderBalances(); addForm.showCatBalance();
+    renderRecent(res.recent);
+    if (res.places) S.places = res.places;
+    markSpendStale();
+    var added = o.kind === 'split' ? (res.added || []) : (res.recent && res.recent[0] ? [res.recent[0]] : []);
+    if (res.duplicate || !added.length) loadRecent(true, true);      // already saved earlier: just re-read
+    else if (S.rec.loaded) {
+      // the new rows went in at the top, so everything already loaded moved down
+      S.rec.items.forEach(function (t) { t.row += added.length; });
+      S.rec.items = added.map(strip).concat(S.rec.items);
+    }
+    renderTxList(); saveCache();
+  }
+  function pendRow(o) {
+    var v = o.view, inflow = v.flow === 'Inflow', failed = o.state === 'failed';
+    return '<li class="saving' + (failed ? ' failed' : '') + '" data-src="pend" data-id="' + esc(o.id) + '">' +
+      '<span class="pend-ic" aria-hidden="true">' + (failed ? '<b>!</b>' : '<span class="spinner"></span>') + '</span>' +
+      '<div class="grow"><div class="t1">' + esc(v.description) + '</div>' +
+      '<div class="t2">' + (failed ? 'Not saved: ' + esc(o.error || 'Could not save.') : 'Saving\u2026 \u00B7 ' + esc(String(v.category).trim()) + ' \u00B7 ' + esc(v.account)) + '</div>' +
+      (failed ? '<div class="pend-act"><button type="button" class="link" data-pend="retry">Retry</button>' +
+                '<button type="button" class="link muted" data-pend="remove">Remove</button></div>' : '') +
+      '</div><div class="amt ' + (inflow ? 'in' : 'out') + '">' + (inflow ? '+' : '\u2212') + money(+v.amount).replace('-', '') + '</div></li>';
+  }
+  function pendHtml() { return myOB().map(pendRow).join(''); }
+  function renderPending() { renderShort(); if (S.boot) renderTxList(); }
+  function onPendClick(li, e) {
+    var b = e.target.closest('[data-pend]'), o = findOB(li.dataset.id);
+    if (!b || !o) return;
+    if (b.dataset.pend === 'retry') {
+      o.state = 'saving'; o.error = ''; if (o.old) o.forced = true; saveOB(); renderPending(); runOutbox();
+      return;
+    }
+    // Remove: give the values back to the Add form if it is empty, so nothing typed is lost
+    dropOB(o.id); renderPending();
+    if (S.autofill && !addForm.touched && !$('amount').value) resetForm();   // a place auto-fill is not typed work
+    var empty = !$('amount').value && !$('description').value.trim() && !S.split;
+    if (!empty) { toast('Removed'); return; }
+    var t = o.tx;
+    if (o.kind === 'split') {
+      addForm.fill({ amount: t.total, description: t.description, date: t.date, flow: t.flow, category: '', account: t.account });
+      S.split = { total: t.total, lines: t.lines.map(function (l) { return { category: l.category, amount: l.amount, memo: l.memo || '' }; }) };
+      renderSplitSummary();
+    } else addForm.fill(t);
+    addForm.touched = true;
+    show('add'); toast('Removed \u2014 it\u2019s back in the form');
   }
 
   /* ---------------- transaction rows (Add's short list + Recent tab) ---------------- */
@@ -1219,7 +1326,8 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
     }).map(function (t) { return t.description; });
   }
   function renderShort() {
-    $('recentList').innerHTML = S.short.length ? S.short.map(function (t, i) { return txRow(t, 'short', i); }).join('') : '<li class="empty">No transactions yet</li>';
+    var pend = pendHtml();
+    $('recentList').innerHTML = pend + (S.short.length ? S.short.map(function (t, i) { return txRow(t, 'short', i); }).join('') : pend ? '' : '<li class="empty">No transactions yet</li>');
   }
   function renderTxList() {
     var q = $('txSearch').value.trim().toLowerCase(), html = '', day = null, open = false;
@@ -1236,19 +1344,22 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
     if (open) html += '</ul>';
     if (!S.rec.loaded) html = '<div class="list"><div class="empty">Loading\u2026</div></div>';
     else if (!shown) html = '<div class="list"><div class="empty">' + (q ? 'No loaded transactions match' : 'No transactions yet') + '</div></div>';
+    var pend = q ? '' : pendHtml();
+    if (pend) html = '<div class="group-title"><span>Saving</span></div><ul class="list tx-list">' + pend + '</ul>' + html;
     $('txList').innerHTML = html;
     $('loadMore').hidden = !S.rec.hasMore;
   }
-  function loadRecent(reset) {
+  function loadRecent(reset, quiet) {
     if (S.rec.loading) return Promise.resolve();
     S.rec.loading = true; $('loadMore').textContent = 'Loading\u2026'; $('loadMore').disabled = true;
-    if (reset) { S.rec.loaded = false; renderTxList(); }
+    if (reset && !quiet) { S.rec.loaded = false; renderTxList(); }
     var off = reset ? 0 : S.rec.items.length;
     return call('getRecent', off, PAGE).then(function (res) {
       var items = res.items.map(strip);
       S.rec.items = reset ? items : S.rec.items.concat(items);
       S.rec.hasMore = res.hasMore; S.rec.loaded = true; renderTxList();
-    }).catch(function (e) { S.rec.loaded = true; renderTxList(); toast(errMsg(e, 'Could not load transactions')); })
+      if (reset) saveCache();
+    }).catch(function (e) { S.rec.loaded = true; renderTxList(); if (!quiet) toast(errMsg(e, 'Could not load transactions')); })
       .then(function () { S.rec.loading = false; $('loadMore').textContent = 'Load more'; $('loadMore').disabled = false; });
   }
   function ensureRecent() { if (!S.rec.loaded) loadRecent(true); else renderTxList(); }
@@ -1262,13 +1373,15 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
     S.short.forEach(function (t) { if (sameTx(t, orig)) { Object.assign(t, strip(item)); } });
   }
   function afterWrite(res) {
+    writeSeq++;
     if (res.recent) renderRecent(res.recent);
     if (res.balances) { S.balances = res.balances; renderBalances(); addForm.showCatBalance(); }
-    S.spendCache = {};
-    renderTxList();
+    markSpendStale();
+    renderTxList(); saveCache();
   }
   function onTxListClick(e) {
     var li = e.target.closest('li[data-src]'); if (!li) return;
+    if (li.dataset.src === 'pend') return onPendClick(li, e);     // still saving: no edit yet
     var t = arrFor(li.dataset.src)[+li.dataset.i]; if (!t) return;
     if (e.target.closest('[data-clr]')) toggleCleared(t); else openEdit(t);
   }
@@ -1280,7 +1393,7 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
     var orig = strip(t), want = !t.cleared;
     var copies = S.rec.items.concat(S.short).filter(function (x) { return x === t || sameTx(x, orig); });
     copies.forEach(function (x) { x._busy = true; x.cleared = want; });
-    renderTxList(); renderShort();
+    renderTxList(); renderShort(); writeSeq++;
     call('setCleared', orig, want).then(function (res) {
       copies.forEach(function (x) { Object.assign(x, strip(res.item)); x._busy = false; });
       afterWrite(res);
@@ -1318,7 +1431,7 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
     var same = tx.date === orig.date && tx.description === orig.description && tx.category === orig.category && tx.account === orig.account &&
       +tx.amount === +orig.amount && tx.flow === orig.flow;     // Cleared isn't editable here; the server keeps it
     if (same) { closeSheet('editWrap'); return; }
-    var btn = $('eSave'); editForm.busy(btn, true, 'Saving\u2026');
+    var btn = $('eSave'); editForm.busy(btn, true, 'Saving\u2026'); writeSeq++;
     call('updateTransaction', orig, tx).then(function (res) {
       applyEverywhere(orig, res.item);
       afterWrite(res); closeSheet('editWrap'); S.edit = null;
@@ -1332,7 +1445,7 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
       resetDelete._t = setTimeout(resetDelete, 4000); return;
     }
     resetDelete();
-    var orig = S.edit.orig; d.disabled = true; d.textContent = 'Deleting\u2026';
+    var orig = S.edit.orig; d.disabled = true; d.textContent = 'Deleting\u2026'; writeSeq++;
     call('deleteTransaction', orig).then(function (res) {
       S.rec.items = S.rec.items.filter(function (x) { return !sameTx(x, orig) && x.row !== res.row; });
       S.rec.items.forEach(function (x) { if (x.row > res.row) x.row--; });
@@ -1385,8 +1498,13 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
   });
   $('placeX').addEventListener('click', function () { S.autofill = null; hidePlaceHint(); });
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible' && $('view-add').classList.contains('active')) { S.loc = null; locate(); }
+    if (document.visibilityState !== 'visible') return;
+    if ($('view-add').classList.contains('active')) { S.loc = null; locate(); }
+    // Back in the app after a while: refresh quietly in the background and send anything still queued.
+    if (S.boot && Date.now() - lastSync > RESUME_REFRESH_MS) boot({ quiet: true });
+    runOutbox(true);
   });
+  window.addEventListener('online', function () { runOutbox(true); });
 
   var LOC_TEXT = {
     idle: 'Location not requested yet.', locating: 'Finding your location\u2026', off: 'Off on this phone.',
@@ -1417,7 +1535,7 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
     var b = $('forgetPlaces');
     if (!b.classList.contains('confirm')) { b.classList.add('confirm'); b.textContent = 'Tap again to forget all places'; resetForget._t = setTimeout(resetForget, 4000); return; }
     resetForget(); b.disabled = true;
-    call('forgetPlaces').then(function () { S.places = []; hidePlaceHint(); renderSettings(); toast('Saved places forgotten'); })
+    call('forgetPlaces').then(function () { S.places = []; hidePlaceHint(); renderSettings(); saveCache(); toast('Saved places forgotten'); })
       .catch(function (e) { b.disabled = false; toast(errMsg(e, 'Could not forget places')); });
   });
 
@@ -1466,12 +1584,47 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
   });
 
   /* ---------------- charts ---------------- */
-  function loadSpending() {
-    var incl = $('inclSavings').checked;
-    var key = S.year + '-' + S.month + '-' + incl;
-    $('monthLabel').textContent = MONTHS[S.month - 1] + ' ' + S.year;
-    var p = S.spendCache[key] ? Promise.resolve(S.spendCache[key]) : call('getSpending', S.year, S.month, incl);
-    p.then(function (d) { S.spendCache[key] = d; renderSpending(d); }).catch(function (e) { toast((e && e.message) || 'Could not load spending'); });
+  /* Spending months are cached (and saved on the phone): a month shows at once from the saved copy and is
+     re-checked in the background when it is older than a minute or a write has happened since. */
+  var SPEND_FRESH_MS = 60000, SPEND_KEEP = 12, spendInflight = {}, spendShown = '';
+  (function () { var c = LS.get('spend', null); if (c && c.kh && c.kh === keyHash() && c.m) S.spendCache = c.m; })();
+  function saveSpend() {
+    var keys = Object.keys(S.spendCache).sort(function (a, b) { return S.spendCache[b].at - S.spendCache[a].at; });
+    keys.slice(SPEND_KEEP).forEach(function (k) { delete S.spendCache[k]; });
+    LS.set('spend', { kh: keyHash(), m: S.spendCache });
+  }
+  function markSpendStale() { Object.keys(S.spendCache).forEach(function (k) { S.spendCache[k].stale = true; }); saveSpend(); }
+  function fetchSpending(y, m, incl) {
+    var k = y + '-' + m + '-' + incl;
+    if (spendInflight[k]) return spendInflight[k];
+    var p = call('getSpending', y, m, incl).then(function (d) { S.spendCache[k] = { at: Date.now(), d: d }; saveSpend(); return d; });
+    var done = function () { delete spendInflight[k]; };
+    p.then(done, done);
+    return (spendInflight[k] = p);
+  }
+  function loadSpending(force) {
+    var incl = $('inclSavings').checked, y = S.year, m = S.month;
+    var key = y + '-' + m + '-' + incl, hit = S.spendCache[key];
+    $('monthLabel').textContent = MONTHS[m - 1] + ' ' + y;
+    if (hit && spendShown !== key + '@' + hit.at) { renderSpending(hit.d); spendShown = key + '@' + hit.at; }
+    if (hit && !force && !hit.stale && Date.now() - hit.at < SPEND_FRESH_MS) { $('view-charts').classList.remove('refreshing'); return; }
+    $('view-charts').classList.toggle('refreshing', !hit);
+    var before = hit ? JSON.stringify(hit.d) : '';
+    fetchSpending(y, m, incl).then(function (d) {
+      var cur = S.year + '-' + S.month + '-' + $('inclSavings').checked;
+      if (cur !== key) return;
+      $('view-charts').classList.remove('refreshing');
+      if (JSON.stringify(d) !== before && $('view-charts').classList.contains('active')) { renderSpending(d); }
+      spendShown = key + '@' + S.spendCache[key].at;
+    }).catch(function (e) {
+      $('view-charts').classList.remove('refreshing');
+      if (!hit) toast((e && e.message) || 'Could not load spending');
+    });
+  }
+  function prefetchSpending() {
+    var incl = $('inclSavings').checked, y = S.year, m = S.month, hit = S.spendCache[y + '-' + m + '-' + incl];
+    if (hit && !hit.stale && Date.now() - hit.at < SPEND_FRESH_MS) return;
+    fetchSpending(y, m, incl).catch(function () {});
   }
   function shiftMonth(n) {
     var m = S.month + n, y = S.year;
@@ -1480,7 +1633,7 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
   }
   $('prevMonth').addEventListener('click', function () { shiftMonth(-1); });
   $('nextMonth').addEventListener('click', function () { shiftMonth(1); });
-  $('inclSavings').addEventListener('change', loadSpending);
+  $('inclSavings').addEventListener('change', function () { loadSpending(); });
 
   function renderSpending(d) {
     $('kSpent').textContent = money(d.total, false);
@@ -1538,35 +1691,77 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
   }
 
   /* ---------------- boot ---------------- */
+  /* Open = show the saved copy at once (if there is one for this key), then one getBootstrap call brings
+     everything fresh: lists, balances, the short list, the first Recent page and places. */
   var LOADING_HTML = $('loading').innerHTML;
-  function boot() {
-    if (!API_READY || !getKey()) { showKeyScreen(); return Promise.resolve(); }
-    $('loading').innerHTML = LOADING_HTML;
-    return call('getBootstrap').then(function (b) {
-      hideKeyScreen();
-      S.boot = b; S.balances = b.balances; S.places = b.places || [];
-      var p = b.today.split('-'); S.year = +p[0]; S.month = +p[1];
-      var hour = new Date().getHours();
-      $('hello').textContent = (hour < 12 ? 'Good morning, ' : hour < 18 ? 'Good afternoon, ' : 'Good evening, ') + b.user.name;
-      resetForm(); renderRecent(b.recent); renderBalances();
-      $('loading').classList.add('hide');
+  var RESUME_REFRESH_MS = 60000, lastSync = 0, bootP = null, prefetchT = null;
+  function formInUse() {
+    return addForm.touched || !!S.split || !!$('amount').value || !!$('description').value.trim() || !!$('category').value;
+  }
+  function applyBoot(b, o) {
+    var first = !S.boot;
+    if (o.saved && b.today < localToday()) b.today = localToday();      // a saved copy from yesterday
+    if (!first && o.partial) {
+      // a write finished while this was loading: keep the rows/balances we have, take the rest
+      b = Object.assign({}, b, { balances: S.balances, recent: S.short, lastAccount: S.boot.lastAccount });
+    }
+    S.boot = b; S.balances = b.balances; S.places = b.places || [];
+    if (first) { var p = b.today.split('-'); S.year = +p[0]; S.month = +p[1]; }
+    var hour = new Date().getHours();
+    $('hello').textContent = (hour < 12 ? 'Good morning, ' : hour < 18 ? 'Good afternoon, ' : 'Good evening, ') + b.user.name;
+    if (first || !formInUse()) resetForm(); else { addForm.renderAccounts(); addForm.showCatBalance(); }
+    renderRecent(b.recent); renderBalances();
+    var pg = o.page, keepLong = S.rec.items.length > PAGE && $('view-recent').classList.contains('active');
+    if (pg && !o.partial && (!keepLong || o.force)) {
+      S.rec.items = pg.items.map(strip); S.rec.hasMore = !!pg.hasMore; S.rec.loaded = true;
+    }
+    if (S.rec.loaded) renderTxList();
+    var wasHidden = $('loading').classList.contains('hide');
+    $('loading').classList.add('hide');
+    if (first || !wasHidden) {
       var h = (location.hash || '').slice(1);
       if (h === 'balances' || h === 'charts' || h === 'recent') show(h); else locate();
+    }
+  }
+  function boot(opts) {
+    opts = opts || {};
+    if (!API_READY || !getKey()) { showKeyScreen(); return Promise.resolve(false); }
+    if (bootP && !opts.fresh) return bootP;
+    if (!S.boot) {
+      var saved = readSaved();
+      if (saved) { applyBoot(saved.boot, { saved: true, page: saved.page }); runOutbox(); }
+      else $('loading').innerHTML = LOADING_HTML;
+    }
+    var seq = writeSeq;
+    var p = bootP = call('getBootstrap', opts.fresh ? { fresh: true } : {}).then(function (b) {
+      hideKeyScreen();
+      applyBoot(b, { page: b.page, force: opts.fresh, partial: seq !== writeSeq || obRunning });
+      lastSync = Date.now(); saveCache();
+      runOutbox(true);
+      clearTimeout(prefetchT); prefetchT = setTimeout(prefetchSpending, 1500);   // Spending opens instantly later
+      return true;
     }).catch(function (e) {
-      if (e && e.code === 'unauthorized') { keyBusy(false); return; }   // key screen is showing
+      if (e && e.code === 'unauthorized') { keyBusy(false); return false; }   // key screen is showing
+      if (S.boot) {                                  // the saved copy is showing: keep it
+        $('loading').classList.add('hide');
+        if (!opts.quiet) toast(e && e.code === 'network' ? 'Offline \u2014 showing saved data' : errMsg(e, 'Could not refresh'));
+        return false;
+      }
       $('loading').innerHTML = '<div class="empty">' + esc(errMsg(e, 'Could not load')) +
         '<br><br><button type="button" class="secondary" id="retryBoot">Try again</button></div>';
       var rb = $('retryBoot'); if (rb) rb.addEventListener('click', function () { boot(); });
-    });
+      return false;
+    }).then(function (ok) { if (bootP === p) bootP = null; return ok; });
+    return p;
   }
   function refreshAll() {
-    S.spendCache = {};
-    return boot().then(function () {
-      if (S.rec.loaded) loadRecent(true);
-      if ($('view-charts').classList.contains('active')) loadSpending();
+    markSpendStale();
+    return boot({ fresh: true }).then(function (ok) {
+      if (ok && $('view-charts').classList.contains('active')) loadSpending(true);
+      return ok;
     });
   }
-  $('refreshBtn').addEventListener('click', function () { refreshAll().then(function () { toast('Up to date'); }); });
+  $('refreshBtn').addEventListener('click', function () { refreshAll().then(function (ok) { if (ok) toast('Up to date'); }); });
 
   $('keyForm').addEventListener('submit', function (ev) {
     ev.preventDefault();
@@ -1580,13 +1775,14 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
   $('forgetKey').addEventListener('click', function () {
     var b = $('forgetKey');
     if (!b.classList.contains('confirm')) { b.classList.add('confirm'); b.textContent = 'Tap again to remove the key'; resetForgetKey._t = setTimeout(resetForgetKey, 4000); return; }
-    resetForgetKey(); setKey(''); closeSheet('setWrap'); S.boot = null;
+    resetForgetKey(); clearSaved(); setKey(''); closeSheet('setWrap'); S.boot = null;
     $('loading').classList.remove('hide'); showKeyScreen();
   });
   window.__ynab = { show: show, S: S, addForm: addForm, editForm: editForm, openPicker: openPicker, openEdit: openEdit,
                     openSheet: openSheet, closeSheet: closeSheet, renderBalances: renderBalances, renderSettings: renderSettings,
                     locate: locate, maybePlaceFill: maybePlaceFill, openSplit: openSplit, SP: function () { return SP; },
-                    syncViewport: syncViewport };
+                    syncViewport: syncViewport, inflight: function () { return inflight; },
+                    outbox: function () { return OB; }, runOutbox: runOutbox };
   boot();
 
   // App shell cache for the home-screen app (sw.js never touches API calls).
