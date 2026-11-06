@@ -238,9 +238,11 @@ body.noscroll{overflow:hidden;position:fixed;left:0;right:0;width:100%}
 /* description suggestions: our own dropdown under the input (Android Chrome draws a native datalist
    as a see-through popup above the field, on top of the amount and the location chip) */
 .ac{position:relative}
-.ac.open{z-index:60}
+.ac.open{z-index:2}
 .ac input{scroll-margin-top:96px;scroll-margin-bottom:24px}
-.ac-list{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:60;margin:0;padding:4px 0;list-style:none;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 36px rgba(0,0,0,.6),0 2px 6px rgba(0,0,0,.4);max-height:284px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+/* In normal flow, under the field. An absolute list sat on top of the category button, so a tap
+   meant for the category picked a suggestion and replaced the typed description. */
+.ac-list{position:relative;z-index:2;margin:6px 0 0;padding:4px 0;list-style:none;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 36px rgba(0,0,0,.6),0 2px 6px rgba(0,0,0,.4);max-height:284px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .ac-list[hidden]{display:none}
 .ac-opt{display:flex;align-items:center;width:100%;min-height:46px;padding:0 14px;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);text-align:left;font-size:16px;cursor:pointer;touch-action:pan-y}
 .ac-opt:last-child{border-bottom:0}
@@ -361,7 +363,7 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
             </div>
             <label class="amount-wrap">
               <span class="cur">$</span>
-              <input id="amount" name="amount" inputmode="decimal" placeholder="0.00" aria-label="Amount">
+              <input id="amount" name="amount" inputmode="decimal" placeholder="0.00" autocomplete="ynab-amount" aria-label="Amount">
             </label>
             <div class="hint" id="flowHint">Money going out</div>
           </div>
@@ -377,7 +379,7 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
             <div class="field">
               <span><label for="description">Description</label></span>
               <div class="ac" id="descAc">
-                <input id="description" placeholder="Walmart, Costco gas&#8230;" maxlength="200" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="descSug">
+                <input id="description" name="ynab-description" placeholder="Walmart, Costco gas&#8230;" maxlength="200" autocomplete="ynab-description" autocorrect="off" autocapitalize="sentences" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="descSug">
                 <div class="ac-list" id="descSug" role="listbox" aria-label="Past descriptions" hidden></div>
               </div>
             </div>
@@ -506,11 +508,11 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
               <button type="button" class="seg-btn active" data-flow="Outflow">Outflow</button>
               <button type="button" class="seg-btn" data-flow="Inflow">Inflow</button>
             </div>
-            <label class="amount-wrap"><span class="cur">$</span><input id="eAmount" inputmode="decimal" placeholder="0.00" aria-label="Amount"></label>
+            <label class="amount-wrap"><span class="cur">$</span><input id="eAmount" name="ynab-amount" inputmode="decimal" placeholder="0.00" autocomplete="ynab-amount" aria-label="Amount"></label>
             <div class="hint" id="eFlowHint">Money going out</div>
           </div>
           <div class="card fields">
-            <div class="field"><span><label for="eDescription">Description</label></span><div class="ac" id="eDescAc"><input id="eDescription" maxlength="200" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="eDescSug"><div class="ac-list" id="eDescSug" role="listbox" aria-label="Past descriptions" hidden></div></div></div>
+            <div class="field"><span><label for="eDescription">Description</label></span><div class="ac" id="eDescAc"><input id="eDescription" name="ynab-description" maxlength="200" autocomplete="ynab-description" autocorrect="off" autocapitalize="sentences" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="eDescSug"><div class="ac-list" id="eDescSug" role="listbox" aria-label="Past descriptions" hidden></div></div></div>
             <div class="field">
               <span>Category</span>
               <button type="button" class="picker-btn" id="eCategoryBtn" aria-haspopup="dialog"><span class="pv placeholder">Choose a category</span></button>
@@ -777,6 +779,7 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
     var w = $(id); w.classList.remove('open'); w.setAttribute('aria-hidden', 'true');
     var a = document.activeElement; if (a && w.contains(a) && a.blur) a.blur();
     if (!document.querySelector('.sheet-wrap.open')) unlockPage();
+    if (id === 'catWrap') releaseTypedHold();
   }
 
   /* ---------------- keyboard-safe sheets ----------------
@@ -830,11 +833,52 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
 
   /* ---------------- category picker (type to filter) ---------------- */
   var picker = { cb: null, cur: '', shown: [] };
+  /* Phones drop in-progress text inputs back to the empty default when this sheet locks the page
+     (body position:fixed) and when focus moves onto the search field. Remember amount/description
+     (and the other typed fields) across that and put them back. A real reset or a new keystroke wins. */
+  var typedHold = null;
+  function typedEls() {
+    var els = [$('amount'), $('description'), $('date'), $('eAmount'), $('eDescription'), $('eDate')];
+    var total = $('sTotal'); if (total) els.push(total);
+    document.querySelectorAll('#sLines input').forEach(function (el) { els.push(el); });
+    return els;
+  }
+  function beginTypedHold() {
+    if (typedHold) typedHold.stop();
+    var saved = typedEls().map(function (el) { return { el: el, v: el.value }; });
+    function onInput(e) {
+      if (!e.isTrusted || !e.inputType) return;   // browser wipes have no inputType; keystrokes do
+      var s = saved.filter(function (x) { return x.el === e.target; })[0];
+      if (s) s.v = s.el.value;
+    }
+    saved.forEach(function (s) { s.el.addEventListener('input', onInput); });
+    var timers = [];
+    function restore() { saved.forEach(function (s) { if (s.el.value !== s.v) s.el.value = s.v; }); }
+    function stop() {
+      timers.forEach(clearTimeout); timers = [];
+      saved.forEach(function (s) { s.el.removeEventListener('input', onInput); });
+      if (typedHold && typedHold.stop === stop) typedHold = null;
+    }
+    typedHold = { restore: restore, stop: stop, timers: timers };
+    return typedHold;
+  }
+  function releaseTypedHold() {
+    if (!typedHold) return;
+    var hold = typedHold;
+    hold.restore();
+    requestAnimationFrame(function () { if (typedHold === hold) hold.restore(); });
+    hold.timers.push(setTimeout(function () { if (typedHold === hold) hold.restore(); }, 0));
+    hold.timers.push(setTimeout(function () { if (typedHold === hold) { hold.restore(); hold.stop(); } }, 400));
+  }
   function openPicker(cur, cb) {
+    beginTypedHold();
+    if (addForm && addForm.suggest) addForm.suggest.close();
+    if (editForm && editForm.suggest) editForm.suggest.close();
     picker.cb = cb; picker.cur = cur || '';
     $('catSearch').value = ''; renderOptions();
     openSheet('catWrap');
     focusNoScroll($('catSearch'));     // synchronous with the tap so iOS raises the keyboard
+    if (typedHold) typedHold.restore();
     var box = $('catOptions'); box.scrollTop = 0;
     // centre the current choice inside the list only (scrollIntoView would also scroll the parent page)
     var sel = box.querySelector('.opt.sel');
@@ -866,7 +910,12 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
     }).join('');
     $('catOptions').innerHTML = html || '<div class="empty">No category matches \u201C' + esc(q) + '\u201D</div>';
   }
-  function pickOption(i) { var v = picker.shown[i]; if (v === undefined) return; closeSheet('catWrap'); $('catSearch').blur(); if (picker.cb) picker.cb(v); }
+  function pickOption(i) {
+    var v = picker.shown[i]; if (v === undefined) return;
+    closeSheet('catWrap'); $('catSearch').blur();
+    if (picker.cb) picker.cb(v);          // category only — typed amount and description stay
+    if (typedHold) typedHold.restore();
+  }
   $('catSearch').addEventListener('input', function () { renderOptions(); $('catOptions').scrollTop = 0; });
   $('catSearch').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); if (picker.shown.length) pickOption(0); } });
   $('catOptions').addEventListener('click', function (e) { var b = e.target.closest('.opt'); if (b) pickOption(+b.dataset.i); });
@@ -897,7 +946,7 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
     function keepVisible() {
       if (list.hidden) return;
       var vv = window.visualViewport, bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
-      if (list.getBoundingClientRect().bottom > bottom - 4) input.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      if (list.getBoundingClientRect().bottom > bottom - 4) list.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
     function render() {
       items = matchDescs(input.value); act = -1;
@@ -950,8 +999,17 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
     this.el('categoryBtn').addEventListener('click', function () {
       openPicker(self.el('category').value, function (v) { self.setCategory(v, true); self.touched = true; });
     });
+    // Keep defaultValue in step with what was typed. A phone that restores a control from its
+    // default (sheet lock, autofill dismiss) would otherwise blank a field whose attribute is still "".
+    function remember(el) {
+      var sync = function () { el.defaultValue = el.value; };
+      el.addEventListener('input', sync);
+      el.addEventListener('change', sync);
+    }
+    remember(this.el('amount')); remember(this.el('description')); remember(this.el('date'));
     this.el('description').addEventListener('change', function () { self.autofillFromDescription(); });
     this.el('description').addEventListener('input', function () { self.touched = true; });
+    this.el('amount').addEventListener('input', function () { self.touched = true; });
     this.suggest = descSuggest(this.el('description'), this.el('descSug'), function () { self.touched = true; self.autofillFromDescription(); });
   }
   Form.prototype.setFlow = function (f) {
@@ -1003,9 +1061,9 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
     this.setAccount(hit.account);
   };
   Form.prototype.fill = function (t) {
-    this.el('amount').value = (+t.amount).toFixed(2);
-    this.el('description').value = t.description;
-    this.el('date').value = t.date;
+    this.el('amount').value = this.el('amount').defaultValue = (+t.amount).toFixed(2);
+    this.el('description').value = this.el('description').defaultValue = t.description;
+    this.el('date').value = this.el('date').defaultValue = t.date;
     this.setFlow(t.flow === 'Inflow' ? 'Inflow' : 'Outflow');
     this.setCategory(t.category, false);
     this.account = t.account; this.renderAccounts();
@@ -1030,8 +1088,10 @@ body{padding-left:var(--safe-l);padding-right:var(--safe-r);overscroll-behavior-
     return S.boot.accounts.indexOf(a) >= 0 ? a : (S.boot.accounts[0] || '');
   }
   function resetForm() {
-    $('amount').value = ''; $('description').value = '';
-    $('date').value = S.boot.today;
+    if (typedHold) typedHold.stop();   // a save really does clear the form; don't put the old text back
+    $('amount').value = $('amount').defaultValue = '';
+    $('description').value = $('description').defaultValue = '';
+    $('date').value = $('date').defaultValue = S.boot.today;
     S.split = null; renderSplitSummary();
     addForm.setFlow('Outflow'); addForm.setCategory('', false);
     addForm.account = addForm.account && addForm.canUseAccount(addForm.account) ? addForm.account : defaultAccount();
